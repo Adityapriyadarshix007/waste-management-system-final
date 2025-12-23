@@ -1,5 +1,5 @@
 # WORKING Dockerfile for Waste Detection API
-FROM python:3.10-slim-bullseye  # Changed to more stable version
+FROM python:3.10-slim-bullseye  
 
 # Install system dependencies - BULLSEYE has stable packages
 RUN apt-get update && apt-get install -y \
