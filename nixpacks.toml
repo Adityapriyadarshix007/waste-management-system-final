@@ -1,0 +1,16 @@
+# Explicitly tell Nixpacks this is a Python project
+[phases.setup]
+cmds = ["cd backend && pip install -r requirements.txt"]
+
+# Skip npm/Node.js phases
+[phases.install]
+skip = true
+
+[phases.build]
+skip = true
+
+[start]
+cmd = "cd backend && python app.py"
+
+[build.env]
+NIXPACKS_BUILD_IGNORE_PATTERNS = "frontend/,node_modules/,package.json,package-lock.json"
