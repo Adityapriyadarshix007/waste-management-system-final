@@ -5,6 +5,7 @@
 FROM python:3.9-slim as builder
 
 # Install system dependencies for OpenCV and other requirements
+# Using updated packages for Debian Bookworm/Trixie
 RUN apt-get update && apt-get install -y \
     build-essential \
     gcc \
@@ -13,12 +14,16 @@ RUN apt-get update && apt-get install -y \
     curl \
     wget \
     git \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender-dev \
     libgomp1 \
+    pkg-config \
+    libjpeg-dev \
+    libpng-dev \
+    libtiff-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create and set working directory
@@ -46,15 +51,19 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Stage 2: Production stage
 FROM python:3.9-slim
 
-# Install minimal runtime dependencies
+# Install minimal runtime dependencies for Debian Bookworm/Trixie
 RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender-dev \
     libgomp1 \
     curl \
+    libjpeg62-turbo \
+    libpng16-16 \
+    libtiff5 \
+    libopenblas0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
@@ -85,7 +94,9 @@ ENV PYTHONUNBUFFERED=1 \
     HF_HOME=/app/hf_cache \
     TORCH_HOME=/app/hf_cache \
     DEBUG=False \
-    FLASK_ENV=production
+    FLASK_ENV=production \
+    OMP_NUM_THREADS=1 \
+    OPENCV_IO_MAX_IMAGE_PIXELS=1099511627776
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
