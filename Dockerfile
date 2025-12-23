@@ -50,6 +50,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 FROM python:3.9-slim-bookworm
 
 # Install minimal runtime dependencies for Debian Bookworm
+# Note: TensorFlow doesn't actually need eigen3 runtime library
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -64,7 +65,6 @@ RUN apt-get update && apt-get install -y \
     libopenblas0 \
     libhdf5-103-1 \
     libc-ares2 \
-    libeigen3-3.4.0 \
     libatlas3-base \
     libssl3 \
     libgfortran5 \
