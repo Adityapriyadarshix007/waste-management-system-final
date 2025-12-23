@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install ONLY essential system packages
+# 1. Install system packages (OpenCV dependencies)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libsm6 \
@@ -11,7 +11,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python packages with specific versions to reduce size
+# 2. Install build tools (required for ultralytics compilation)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    python3-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# 3. Install Python packages
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
     torch==2.2.1 --index-url https://download.pytorch.org/whl/cpu \
@@ -23,10 +31,15 @@ RUN pip install --no-cache-dir --upgrade pip && \
     Pillow==10.4.0 \
     gunicorn==21.2.0
 
-# Copy application code
+# 4. Clean up build tools to reduce image size (optional but recommended)
+RUN apt-get purge -y --auto-remove gcc g++ python3-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# 5. Copy application code
 COPY backend/ .
 
-# Create necessary directories
+# 6. Create necessary directories
 RUN mkdir -p uploads hf_cache
 
 EXPOSE 8000
