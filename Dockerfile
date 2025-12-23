@@ -64,7 +64,7 @@ RUN apt-get update && apt-get install -y \
     libopenblas0 \
     libhdf5-103-1 \
     libc-ares2 \
-    libeigen3-3.4.0 \          # Changed from libeigen3-3.4
+    libeigen3-3.4.0 \
     libatlas3-base \
     libssl3 \
     libgfortran5 \
