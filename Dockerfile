@@ -1,21 +1,22 @@
-# Stage 1: Builder
-FROM python:3.9-slim as builder
+FROM python:3.9-slim
 
 WORKDIR /app
 
+# 1. Install ONLY essential system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc g++ python3-dev \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Install packages to venv
+# 2. Install Python packages WITHOUT OpenCV (use Pillow for image processing)
 RUN pip install --no-cache-dir \
-    opencv-python-headless \
-    torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu \
-    torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cpu \
+    numpy==1.23.5 \
+    # SKIP OpenCV entirely - use Pillow instead
+    torch==1.13.1 --index-url https://download.pytorch.org/whl/cpu \
+    torchvision==0.14.1 --index-url https://download.pytorch.org/whl/cpu \
     ultralytics==8.0.196 \
     huggingface-hub==0.19.4 \
     Flask==2.3.3 \
@@ -24,23 +25,24 @@ RUN pip install --no-cache-dir \
     Pillow==10.1.0 \
     gunicorn==21.2.0
 
-# Stage 2: Runtime
-FROM python:3.9-slim
+# 3. Modify your app.py to remove OpenCV import
+# Replace: import cv2
+# With: from PIL import Image
+# Add this line to your app.py:
+# print("WARNING: OpenCV not installed, using Pillow for image processing")
 
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libglib2.0-0 libsm6 libxext6 libxrender1 libgl1 \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Copy virtual environment from builder
-COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
+# 4. Copy application code
 COPY backend/ .
+
+# 5. Create directories
 RUN mkdir -p uploads hf_cache
 
+# 6. Set environment variables
 ENV PORT=5001
+ENV MODEL_CACHE_DIR=./hf_cache
+ENV DEBUG=False
+
 EXPOSE 5001
 
+# 7. Start the application
 CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--workers", "1", "app:app"]
