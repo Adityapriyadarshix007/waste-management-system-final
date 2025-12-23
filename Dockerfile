@@ -2,24 +2,14 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# 1. Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
-    libgomp1 \
-    # Add these for OpenCV compatibility
-    libgl1 \
-    libglu1-mesa \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    libglib2.0-0 libsm6 libxext6 libxrender1 libgl1 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. Install Python packages WITHOUT OpenCV version pin
+# Use STANDARD opencv-python (NOT headless)
 RUN pip install --no-cache-dir \
     numpy==1.23.5 \
-    # NO VERSION PIN - let pip find compatible version
-    opencv-python-headless \
+    opencv-python \
     torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu \
     torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cpu \
     ultralytics==8.0.196 \
@@ -30,18 +20,10 @@ RUN pip install --no-cache-dir \
     Pillow==10.1.0 \
     gunicorn==21.2.0
 
-# 3. Copy application code
 COPY backend/ .
-
-# 4. Create directories
 RUN mkdir -p uploads hf_cache
 
-# 5. Set environment variables
 ENV PORT=5001
-ENV MODEL_CACHE_DIR=./hf_cache
-ENV DEBUG=False
-
 EXPOSE 5001
 
-# 6. Start the application
 CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--workers", "1", "app:app"]
