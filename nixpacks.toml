@@ -1,8 +1,14 @@
-# Explicitly tell Nixpacks this is a Python project
-[phases.setup]
-cmds = ["cd backend && pip install -r requirements.txt"]
+# nixpacks.toml
+[provider]
+provider = "python"
+pythonVersion = "3.11"
 
-# Skip npm/Node.js phases
+[phases.setup]
+cmds = [
+    "python -m pip install --upgrade pip setuptools wheel",
+    "cd backend && pip install --no-cache-dir -r requirements.txt"
+]
+
 [phases.install]
 skip = true
 
@@ -10,7 +16,4 @@ skip = true
 skip = true
 
 [start]
-cmd = "cd backend && python app.py"
-
-[build.env]
-NIXPACKS_BUILD_IGNORE_PATTERNS = "frontend/,node_modules/,package.json,package-lock.json"
+cmd = "cd backend && gunicorn --bind 0.0.0.0:$PORT app:app"
