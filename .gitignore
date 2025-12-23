@@ -1,24 +1,61 @@
+# Local .gitignore
+node_modules/
+.env
+
+# GitHub .gitignore
+*.pyc
+__pycache__/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
 # Logs
-logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# YOLO dataset (large files - consider Git LFS)
+# backend/yolo_dataset_final/
+*.weights
+*.pt
+*.pth
+*.onnx
+
+# Frontend build
+dist/
+build/
+.out/
+.next/
+
+# Coverage directory
+coverage/
+
+# Railway
+.railway/
