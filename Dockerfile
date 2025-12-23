@@ -2,7 +2,7 @@ FROM python:3.11-alpine
 
 WORKDIR /app
 
-# Alpine packages are smaller
+# Alpine packages
 RUN apk add --no-cache \
     libstdc++ \
     libgcc \
@@ -21,17 +21,14 @@ RUN apk add --no-cache \
     tcl \
     tk
 
-# Copy requirements
 COPY backend/requirements.txt .
 
-# Install Python packages
+# REMOVE --no-deps flag - it skips dependencies!
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
-    --no-deps \
-    -r requirements.txt
+    -r requirements.txt  # No --no-deps!
 
 COPY backend/ .
-
 RUN mkdir -p uploads hf_cache
 
 EXPOSE 8000
