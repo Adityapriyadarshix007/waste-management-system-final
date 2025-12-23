@@ -1,41 +1,61 @@
-<<<<<<< HEAD
-# Ignore frontend - deploy separately to Vercel
+# Create a clean .railwayignore
+cat > .railwayignore << 'EOF'
+# Ignore entire frontend directory
 frontend/
 
-# Ignore Node.js files
+# Ignore Node.js/npm files
 package.json
 package-lock.json
 node_modules/
-*.js
-*.jsx
-*.ts
-*.tsx
 
-# Ignore large files
+# Ignore build/config files
+vite.config.js
+tailwind.config.js
+postcss.config.js
+eslint.config.js
+*.config.js
+
+# Ignore documentation
+*.md
+.gitignore
+README.md
+LICENSE
+CHANGELOG.md
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+*.log
+
+# Ignore Python cache and virtual envs
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+venv/
+env/
+*.env
+
+# Ignore large files and ML model files
 *.pt
 *.pth
+*.weights
+*.onnx
+*.h5
 dataset/
 datasets/
 runs/
 weights/
 uploads/
-=======
-frontend/
-package.json
-package-lock.json
-node_modules/
+tmp/
+temp/
+
+# Ignore source files (Railway only needs backend)
 *.js
 *.jsx
 *.ts
 *.tsx
-*.html
 *.css
-tailwind.config.js
-postcss.config.js
-vite.config.js
-eslint.config.js
-public/
-src/
-dist/
-build/
->>>>>>> 12e717c0 (Fixed: .railwayignore excludes frontend from Railway)
+*.html
+EOF
