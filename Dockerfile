@@ -1,11 +1,11 @@
 # Dockerfile for Waste Detection API with YOLOv8
 # Multi-stage build for optimized image size
+# Using python:3.9-slim-bookworm for stable Debian Bookworm environment
 
 # Stage 1: Build stage with all dependencies
-FROM python:3.9-slim as builder
+FROM python:3.9-slim-bookworm as builder
 
 # Install system dependencies for OpenCV and other requirements
-# Using updated packages for Debian Bookworm/Trixie
 RUN apt-get update && apt-get install -y \
     build-essential \
     gcc \
@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     wget \
     git \
-    libgl1 \
+    libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
@@ -49,11 +49,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
     --index-url https://download.pytorch.org/whl/cpu
 
 # Stage 2: Production stage
-FROM python:3.9-slim
+FROM python:3.9-slim-bookworm
 
-# Install minimal runtime dependencies for Debian Bookworm/Trixie
+# Install minimal runtime dependencies for Debian Bookworm
 RUN apt-get update && apt-get install -y \
-    libgl1 \
+    libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
