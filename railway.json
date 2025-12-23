@@ -5,8 +5,6 @@
     "buildCommand": "cd backend && pip install -r requirements.txt"
   },
   "deploy": {
-    "startCommand": "cd backend && python app.py",
-    "healthCheckPath": "/health",
-    "healthCheckTimeout": 300
+    "startCommand": "cd backend && python app.py"
   }
 }
