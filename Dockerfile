@@ -1,15 +1,19 @@
-FROM python:3.9-slim
+# Stage 1: Builder
+FROM python:3.9-slim as builder
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libglib2.0-0 libsm6 libxext6 libxrender1 libgl1 \
+    gcc g++ python3-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Use STANDARD opencv-python (NOT headless)
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install packages to venv
 RUN pip install --no-cache-dir \
-    numpy==1.23.5 \
-    opencv-python \
+    opencv-python-headless \
     torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu \
     torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cpu \
     ultralytics==8.0.196 \
@@ -19,6 +23,19 @@ RUN pip install --no-cache-dir \
     flask-sqlalchemy==3.0.5 \
     Pillow==10.1.0 \
     gunicorn==21.2.0
+
+# Stage 2: Runtime
+FROM python:3.9-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 libsm6 libxext6 libxrender1 libgl1 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 COPY backend/ .
 RUN mkdir -p uploads hf_cache
