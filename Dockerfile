@@ -2,30 +2,24 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# 1. Install system dependencies (simplified for Debian 12)
+# 1. Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
-    libgomp1 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    libglib2.0-0 libsm6 libxext6 libxrender1 libgomp1 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. Install Python packages
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir \
-    numpy==1.24.3 \
-    opencv-python-headless==4.10.0.84 \
-    torch==2.2.1+cpu --index-url https://download.pytorch.org/whl/cpu \
-    torchvision==0.17.1+cpu --index-url https://download.pytorch.org/whl/cpu \
-    ultralytics==8.1.0 \
-    huggingface-hub==0.19.4 \
-    Flask==3.1.0 \
-    flask-cors==4.0.0 \
-    flask-sqlalchemy==3.1.1 \
-    Pillow==10.4.0 \
-    gunicorn==21.2.0
+# 2. Don't upgrade pip - use existing version
+RUN pip install --no-cache-dir \
+    numpy==1.26.0 \
+    opencv-python-headless \
+    torch==2.2.1 --index-url https://download.pytorch.org/whl/cpu \
+    torchvision==0.17.1 --index-url https://download.pytorch.org/whl/cpu \
+    ultralytics \
+    huggingface-hub \
+    Flask \
+    flask-cors \
+    flask-sqlalchemy \
+    Pillow \
+    gunicorn
 
 COPY backend/ .
 RUN mkdir -p uploads hf_cache
