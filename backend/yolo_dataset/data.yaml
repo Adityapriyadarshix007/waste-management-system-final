@@ -1,0 +1,7 @@
+path: /Users/adityapriyadarshi/Desktop/waste-management-system/backend/yolo_dataset
+train: images/train
+val: images/val
+test: images/test
+
+nc: 2
+names: ['organic', 'recyclable']

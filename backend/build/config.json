@@ -1,0 +1,15 @@
+{
+  "api_endpoint": "/api/detect",
+  "available_models": 5,
+  "waste_categories": [
+    "biodegradable",
+    "recyclable",
+    "hazardous",
+    "non_recyclable"
+  ],
+  "model_info": {
+    "primary": "best.pt",
+    "backup": "yolov8s.pt",
+    "third": "yolov8n.pt"
+  }
+}

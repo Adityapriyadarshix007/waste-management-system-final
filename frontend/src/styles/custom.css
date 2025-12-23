@@ -1,0 +1,299 @@
+/* Waste Management Custom Styles */
+
+/* Earth/Environment Theme */
+.environment-theme {
+  background: radial-gradient(circle at 10% 20%, rgba(91, 173, 254, 0.1) 0%, rgba(245, 247, 250, 0.1) 100%);
+}
+
+/* Dustbin Status Indicators */
+.dustbin-status {
+  position: relative;
+  overflow: hidden;
+}
+
+.dustbin-status::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: shine 2s infinite;
+}
+
+@keyframes shine {
+  100% {
+    left: 100%;
+  }
+}
+
+/* Waste Flow Animation */
+.waste-flow {
+  position: relative;
+}
+
+.waste-flow::after {
+  content: '♻️';
+  position: absolute;
+  font-size: 1.5rem;
+  opacity: 0;
+  animation: waste-flow 3s linear infinite;
+}
+
+@keyframes waste-flow {
+  0% {
+    top: -20px;
+    left: 10%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    left: 90%;
+    opacity: 0;
+  }
+}
+
+/* Recycling Symbol Animation */
+.recycling-symbol {
+  animation: recycling-spin 4s linear infinite;
+}
+
+@keyframes recycling-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Eco Impact Meter */
+.eco-meter {
+  height: 8px;
+  background: linear-gradient(to right, #ef4444, #f59e0b, #10b981);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.eco-meter::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+  animation: eco-shimmer 2s infinite;
+}
+
+@keyframes eco-shimmer {
+  100% {
+    left: 100%;
+  }
+}
+
+/* Carbon Footprint Visualization */
+.carbon-footprint {
+  position: relative;
+  padding: 20px;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+}
+
+.carbon-footprint::before {
+  content: '🌍';
+  position: absolute;
+  font-size: 2rem;
+  animation: earth-breathe 4s ease-in-out infinite;
+}
+
+@keyframes earth-breathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+/* Detection Grid Overlay */
+.detection-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(rgba(34, 197, 94, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 197, 94, 0.1) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+/* Object Detection Highlight */
+.object-highlight {
+  position: absolute;
+  border: 3px solid;
+  border-radius: 12px;
+  box-shadow: 0 0 30px currentColor;
+  animation: highlight-pulse 1.5s ease-in-out infinite;
+  z-index: 20;
+}
+
+@keyframes highlight-pulse {
+  0%, 100% {
+    box-shadow: 0 0 10px currentColor;
+    border-width: 2px;
+  }
+  50% {
+    box-shadow: 0 0 30px currentColor;
+    border-width: 4px;
+  }
+}
+
+/* Waste Category Color Coding */
+.category-green {
+  --color-primary: #10b981;
+  --color-secondary: #34d399;
+  --color-glow: rgba(16, 185, 129, 0.3);
+}
+
+.category-blue {
+  --color-primary: #3b82f6;
+  --color-secondary: #60a5fa;
+  --color-glow: rgba(59, 130, 246, 0.3);
+}
+
+.category-red {
+  --color-primary: #ef4444;
+  --color-secondary: #f87171;
+  --color-glow: rgba(239, 68, 68, 0.3);
+}
+
+.category-gray {
+  --color-primary: #6b7280;
+  --color-secondary: #9ca3af;
+  --color-glow: rgba(107, 114, 128, 0.3);
+}
+
+/* Statistics Counter Animation */
+.counter {
+  font-variant-numeric: tabular-nums;
+}
+
+.counter.animate {
+  animation: count-up 2s ease-out forwards;
+}
+
+@keyframes count-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Timeline for Waste Journey */
+.waste-journey {
+  position: relative;
+}
+
+.waste-journey::before {
+  content: '';
+  position: absolute;
+  left: 20px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(to bottom, #10b981, #3b82f6, #ef4444, #6b7280);
+}
+
+/* Loading Skeleton */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Environmental Impact Score */
+.impact-score {
+  font-size: 3rem;
+  font-weight: bold;
+  background: linear-gradient(45deg, #10b981, #3b82f6, #8b5cf6);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  position: relative;
+}
+
+.impact-score::after {
+  content: '🌱';
+  position: absolute;
+  right: -40px;
+  font-size: 2rem;
+  animation: leaf-float 3s ease-in-out infinite;
+}
+
+@keyframes leaf-float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  33% {
+    transform: translateY(-10px) rotate(10deg);
+  }
+  66% {
+    transform: translateY(5px) rotate(-10deg);
+  }
+}
+
+/* Waste Sorting Guide */
+.sorting-guide {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-left: 6px solid;
+  transition: all 0.3s ease;
+}
+
+.sorting-guide:hover {
+  transform: translateX(10px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* Camera Focus Ring */
+.focus-ring {
+  position: absolute;
+  border: 3px solid #10b981;
+  border-radius: 50%;
+  animation: focus-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes focus-pulse {
+  0%, 100% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}

@@ -1,0 +1,9 @@
+# waste_data.yaml
+path: /Users/adityapriyadarshi/Desktop/waste-management-system/backend/yolo_dataset_final
+train: images/train
+val: images/val
+test: images/test
+nc: 2
+names:
+  0: organic
+  1: recyclable
