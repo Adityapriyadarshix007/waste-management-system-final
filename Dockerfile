@@ -1,9 +1,8 @@
 # Dockerfile for Waste Detection API with YOLOv8
-# Multi-stage build for optimized image size
-# Using python:3.9-slim-bookworm for stable Debian Bookworm environment
+# Using python:3.11-slim-bookworm for Keras 3.x compatibility
 
 # Stage 1: Build stage with all dependencies
-FROM python:3.9-slim-bookworm as builder
+FROM python:3.11-slim-bookworm as builder
 
 # Install system dependencies for OpenCV, TensorFlow, and other requirements
 RUN apt-get update && apt-get install -y \
@@ -47,10 +46,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
     && pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Production stage
-FROM python:3.9-slim-bookworm
+FROM python:3.11-slim-bookworm
 
 # Install minimal runtime dependencies for Debian Bookworm
-# Note: TensorFlow doesn't actually need eigen3 runtime library
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -77,7 +75,7 @@ RUN useradd -m -u 1000 -s /bin/bash appuser && \
 WORKDIR /app
 
 # Copy Python dependencies from builder stage
-COPY --from=builder /usr/local/lib/python3.9/site-packages/ /usr/local/lib/python3.9/site-packages/
+COPY --from=builder /usr/local/lib/python3.11/site-packages/ /usr/local/lib/python3.11/site-packages/
 COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
 # Copy application code
