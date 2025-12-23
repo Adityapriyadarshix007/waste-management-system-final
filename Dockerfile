@@ -1,48 +1,98 @@
-FROM python:3.9-slim
+# Dockerfile for Waste Detection API with YOLOv8
+# Multi-stage build for optimized image size
 
-WORKDIR /app
+# Stage 1: Build stage with all dependencies
+FROM python:3.9-slim as builder
 
-# 1. Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install system dependencies for OpenCV and other requirements
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    g++ \
+    cmake \
+    curl \
+    wget \
+    git \
+    libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
-    libxrender1 \
-    # Install OpenCV from system packages
-    python3-opencv \
-    && apt-get clean \
+    libxrender-dev \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Install Python packages with YOLOv5 INSTEAD of ultralytics
-RUN pip install --no-cache-dir \
-    numpy==1.23.5 \
-    torch==1.13.1 --index-url https://download.pytorch.org/whl/cpu \
-    torchvision==0.14.1 --index-url https://download.pytorch.org/whl/cpu \
-    # REPLACEMENT: Use YOLOv5 instead of ultralytics
-    yolov5 \
-    huggingface-hub==0.19.4 \
+# Create and set working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+COPY app.py .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
     Flask==2.3.3 \
-    flask-cors==4.0.0 \
-    flask-sqlalchemy==3.0.5 \
-    Pillow==10.1.0 \
-    gunicorn==21.2.0
+    Flask-CORS==4.0.0 \
+    numpy==1.24.3 \
+    Pillow==10.0.0 \
+    opencv-python-headless==4.8.1.78 \
+    ultralytics==8.0.196 \
+    huggingface-hub==0.19.4 \
+    torch==2.0.1 \
+    torchvision==0.15.2 \
+    pyyaml==6.0 \
+    --index-url https://download.pytorch.org/whl/cpu
 
-# 3. Copy application code
-COPY backend/ .
+# Stage 2: Production stage
+FROM python:3.9-slim
 
-# 4. Create directories
-RUN mkdir -p uploads hf_cache
+# Install minimal runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# 5. Test imports work
-RUN python -c "import cv2; print(f'✅ OpenCV: {cv2.__version__}')" && \
-    python -c "import yolov5; print('✅ YOLOv5 import successful')"
+# Create non-root user for security
+RUN useradd -m -u 1000 -s /bin/bash appuser && \
+    mkdir -p /app && chown -R appuser:appuser /app
 
-# 6. Set environment variables
-ENV PORT=5001
-ENV MODEL_CACHE_DIR=./hf_cache
-ENV DEBUG=False
+WORKDIR /app
 
-EXPOSE 5001
+# Copy Python dependencies from builder stage
+COPY --from=builder /usr/local/lib/python3.9/site-packages/ /usr/local/lib/python3.9/site-packages/
+COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
-# 7. Start the application
-CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--workers", "1", "app:app"]
+# Copy application code
+COPY --chown=appuser:appuser . .
+
+# Create necessary directories
+RUN mkdir -p uploads hf_cache waste_dataset && \
+    chown -R appuser:appuser uploads hf_cache waste_dataset
+
+# Switch to non-root user
+USER appuser
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PORT=5001 \
+    MODEL_CACHE_DIR=/app/hf_cache \
+    HF_HOME=/app/hf_cache \
+    TORCH_HOME=/app/hf_cache \
+    DEBUG=False \
+    FLASK_ENV=production
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-5001}/health || exit 1
+
+# Expose port (Railway will override PORT env variable)
+EXPOSE ${PORT}
+
+# Run the application
+CMD ["python", "app.py"]
