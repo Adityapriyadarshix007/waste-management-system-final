@@ -1,50 +1,63 @@
-# Use the official Python 3.11 slim image as a base
 FROM python:3.11-slim
 
-# Set the working directory in the container
 WORKDIR /app
 
-# 1. Install system-level dependencies in a single layer
+# 1. Install ALL system dependencies in a single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # OpenCV runtime dependencies
+    # OpenCV dependencies
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender1 \
-    # Compiler and build tools for compiling Python packages
+    # Build tools for compiling Python packages
     gcc \
     g++ \
     python3-dev \
     pkg-config \
-    # Clean up apt cache to keep image small
+    curl \
+    wget \
+    # Clean up to reduce image size
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Install Python packages
-# We upgrade pip, wheel, and setuptools first to known stable versions
-RUN pip install --no-cache-dir --upgrade "pip<25.0" "wheel" "setuptools"
-# Now install your application packages
+# 2. Verify Python environment
+RUN python -c "import sys; print('Python version:', sys.version); print('Platform:', sys.platform)"
+
+# 3. Upgrade pip and setuptools to stable versions
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# 4. Install Python packages with specific compatible versions
 RUN pip install --no-cache-dir \
-    torch==2.2.1 --index-url https://download.pytorch.org/whl/cpu \
-    torchvision==0.17.1 --index-url https://download.pytorch.org/whl/cpu \
-    ultralytics \
+    numpy==1.26.4 \
+    Pillow==10.4.0
+
+# 5. Install PyTorch first (explicitly specify CPU version)
+RUN pip install --no-cache-dir \
+    torch==2.2.1+cpu --index-url https://download.pytorch.org/whl/cpu \
+    torchvision==0.17.1+cpu --index-url https://download.pytorch.org/whl/cpu
+
+# 6. Install ultralytics with exact version that's known to work
+RUN pip install --no-cache-dir \
+    ultralytics==8.1.0
+
+# 7. Install remaining packages
+RUN pip install --no-cache-dir \
     opencv-python-headless==4.10.0.84 \
     Flask==3.1.0 \
-    numpy==1.26.4 \
-    Pillow==10.4.0 \
-    gunicorn==21.2.0
+    gunicorn==21.2.0 \
+    gevent==24.10.1
 
-# 3. (Optional) Clean up build tools to reduce final image size
+# 8. Clean up build tools (optional but recommended for size)
 RUN apt-get purge -y --auto-remove gcc g++ python3-dev pkg-config \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 4. Copy your application code
+# 9. Copy application code
 COPY backend/ .
 
-# 5. Create any necessary directories
+# 10. Create necessary directories
 RUN mkdir -p uploads hf_cache
 
-# 6. Expose port and define the startup command
 EXPOSE 8000
+
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "1", "--timeout", "120", "app:app"]
