@@ -9,13 +9,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     libxrender1 \
     libgomp1 \
+    # Add compiler tools for OpenCV compilation
+    gcc \
+    g++ \
+    python3-dev \
+    pkg-config \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. DO NOT UPGRADE PIP - Install packages with existing pip
+# 2. Install packages WITHOUT specific version for OpenCV
 RUN pip install --no-cache-dir \
     numpy==1.23.5 \
-    opencv-python-headless==4.8.1.78 \
+    # Use standard opencv-python (NOT headless)
+    opencv-python \
     torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu \
     torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cpu \
     ultralytics==8.0.196 \
@@ -26,18 +32,23 @@ RUN pip install --no-cache-dir \
     Pillow==10.1.0 \
     gunicorn==21.2.0
 
-# 3. Copy application code
+# 3. Clean up build tools (optional)
+RUN apt-get purge -y --auto-remove gcc g++ python3-dev pkg-config \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# 4. Copy application code
 COPY backend/ .
 
-# 4. Create directories
+# 5. Create directories
 RUN mkdir -p uploads hf_cache
 
-# 5. Set environment variables
+# 6. Set environment variables
 ENV PORT=5001
 ENV MODEL_CACHE_DIR=./hf_cache
 ENV DEBUG=False
 
 EXPOSE 5001
 
-# 6. Start the application
+# 7. Start the application
 CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--workers", "1", "app:app"]
