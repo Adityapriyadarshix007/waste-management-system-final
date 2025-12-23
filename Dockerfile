@@ -49,7 +49,7 @@ RUN python -c "from flask import Flask; from ultralytics import YOLO; from PIL i
 ENV PORT=5001
 ENV MODEL_CACHE_DIR=./hf_cache
 ENV DEBUG=False
-ENV NO_CV=1  # Flag to indicate no OpenCV
+ENV NO_CV=1 
 
 EXPOSE 5001
 
