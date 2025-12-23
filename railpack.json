@@ -1,0 +1,17 @@
+{
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "cd backend && pip install -r requirements.txt"
+  },
+  "deploy": {
+    "startCommand": "cd backend && python app.py",
+    "restartPolicy": {
+      "type": "ON_FAILURE",
+      "maximumRetries": 3
+    }
+  },
+  "healthCheck": {
+    "path": "/health",
+    "port": 5001
+  }
+}
