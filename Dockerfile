@@ -1,19 +1,16 @@
-FROM python:3.10-bullseye
+# Stage 1: Builder
+FROM python:3.10-bullseye as builder
 
 WORKDIR /app
 
-# 1. Install ALL required system libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
-    libgomp1 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender1 \
+    gcc g++ python3-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. Install Python packages with TESTED COMPATIBLE versions
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
     numpy==1.23.5 \
@@ -28,18 +25,26 @@ RUN pip install --no-cache-dir --upgrade pip && \
     Pillow==10.1.0 \
     gunicorn==21.2.0
 
-# 3. Copy application code
+# Stage 2: Runtime
+FROM python:3.10-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
 COPY backend/ .
+RUN mkdir -p uploads hf_cache
 
-# 4. Create directories
-RUN mkdir -p uploads hf_cache static
-
-# 5. Set environment variables
 ENV PORT=5001
-ENV MODEL_CACHE_DIR=./hf_cache
-ENV DEBUG=False
-
 EXPOSE 5001
 
-# 6. Start the application
 CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--workers", "1", "app:app"]
