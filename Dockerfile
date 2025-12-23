@@ -2,15 +2,17 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# 1. Install system dependencies
+# 1. Install system dependencies - USE UPDATED PACKAGE NAMES
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # OpenCV graphical dependencies (FIXES libGL.so.1 error)
-    libgl1-mesa-glx \
+    # OpenCV graphical dependencies for Debian 12
+    libgl1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender1 \
     libgomp1 \
+    libegl1 \
+    libxcb1 \
     # Clean up
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
