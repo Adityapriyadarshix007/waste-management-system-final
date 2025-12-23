@@ -60,7 +60,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     libjpeg62-turbo \
     libpng16-16 \
-    libtiff6 \
+    libtiff6 \               # Changed from libtiff5 to libtiff6
     libopenblas0 \
     libhdf5-103-1 \
     libc-ares2 \
