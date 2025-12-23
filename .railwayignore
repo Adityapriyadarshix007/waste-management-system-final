@@ -1,0 +1,20 @@
+# Ignore frontend - deploy separately to Vercel
+frontend/
+
+# Ignore Node.js files
+package.json
+package-lock.json
+node_modules/
+*.js
+*.jsx
+*.ts
+*.tsx
+
+# Ignore large files
+*.pt
+*.pth
+dataset/
+datasets/
+runs/
+weights/
+uploads/
