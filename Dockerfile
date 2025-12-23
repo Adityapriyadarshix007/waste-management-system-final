@@ -52,6 +52,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 FROM python:3.9-slim-bookworm
 
 # Install minimal runtime dependencies for Debian Bookworm
+# NOTE: libtiff5 has been updated to libtiff6 in Bookworm
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -62,7 +63,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     libjpeg62-turbo \
     libpng16-16 \
-    libtiff5 \
+    libtiff6 \
     libopenblas0 \
     && rm -rf /var/lib/apt/lists/*
 
