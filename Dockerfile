@@ -1,5 +1,5 @@
 # Dockerfile for Waste Detection API - CORRECTED VERSION
-FROM python:3.10-slim-bullseye  # Changed to 3.10 for better compatibility
+FROM python:3.10-slim-bullseye
 
 # Install system dependencies for Debian Bullseye
 RUN apt-get update && apt-get install -y \
