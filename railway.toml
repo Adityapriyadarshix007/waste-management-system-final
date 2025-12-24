@@ -1,5 +1,5 @@
 [build]
-builder = "nixpacks"
+builder = "dockerfile"
 
 [deploy]
-startCommand = "./start.sh"
+startCommand = "--bind 0.0.0.0:$PORT app:app"
