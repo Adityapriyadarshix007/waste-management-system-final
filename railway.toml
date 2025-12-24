@@ -2,4 +2,4 @@
 builder = "dockerfile"
 
 [deploy]
-startCommand = "--bind 0.0.0.0:$PORT app:app"
+"startCommand": "gunicorn --bind 0.0.0.0:$PORT app:app"
