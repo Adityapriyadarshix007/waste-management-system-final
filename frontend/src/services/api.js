@@ -2,16 +2,19 @@ import axios from 'axios';
 
 // URLs for different environments
 const LOCAL_API_URL = 'http://localhost:5001';  // Local development
-const RENDER_API_URL = window.location.origin;  // Same origin on Render
+const RAILWAY_API_URL = 'https://waste-management-system-final-production-eb97.up.railway.app';  // Your Railway URL
 
 // Determine which URL to use based on environment
 const isDevelopment = window.location.hostname === 'localhost' || 
                       window.location.hostname === '127.0.0.1';
 
-const API_BASE_URL = isDevelopment ? LOCAL_API_URL : RENDER_API_URL;
+const API_BASE_URL = isDevelopment ? LOCAL_API_URL : RAILWAY_API_URL;
 
 console.log(`🚀 API Base URL: ${API_BASE_URL}`);
 console.log(`🌐 Environment: ${isDevelopment ? 'Development' : 'Production'}`);
+console.log(`🔗 Backend: ${API_BASE_URL === LOCAL_API_URL ? 'Local' : 'Railway'}`);
+
+// The rest of your code stays the same...
 
 // Create axios instance
 const API = axios.create({
