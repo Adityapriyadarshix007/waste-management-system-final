@@ -1151,7 +1151,7 @@ def internal_error(error):
 # ==================== MAIN EXECUTION ====================
 if __name__ == '__main__':
     # Use Railway's PORT environment variable, fallback to 5001 for local
-    port = int(os.environ.get("PORT", 5001))
+    port = 5001  # Hardcoded port number
     
     print(f"\n{'='*70}")
     print(f"🌐 API STARTING ON PORT {port}")
