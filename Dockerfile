@@ -19,4 +19,5 @@ RUN mkdir -p hf_cache
 
 EXPOSE 5001
 
+# Use Python instead of Gunicorn
 CMD ["python", "app.py"]
