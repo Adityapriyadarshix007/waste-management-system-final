@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 import os
 import time
 import numpy as np
@@ -58,14 +58,42 @@ MODEL_PATH = None
 model_loaded = False
 model_hash = None
 
-# ==================== FLASK APP ====================
+# ==================== FLASK APP WITH BULLETPROOF CORS ====================
 app = Flask(__name__)
-CORS(app, origins=[
-    "http://localhost:5173",  # Vite dev server
-    "http://localhost:3000",  # Alternative local
-    "https://waste-management-system-frontend.vercel.app",  # Your Vercel frontend
-    "https://*.vercel.app"  # All Vercel deployments
-])
+
+# Configure CORS to allow ALL origins and methods
+app.config['CORS_HEADERS'] = 'Content-Type'
+
+# Initialize CORS with maximum permissiveness
+CORS(app, 
+     resources={r"/*": {"origins": "*"}},
+     supports_credentials=True,
+     allow_headers=["*"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"])
+
+# Force CORS headers on ALL responses
+@app.after_request
+def add_cors_headers(response):
+    """Force CORS headers on every single response"""
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, Origin'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    response.headers['Access-Control-Max-Age'] = '86400'
+    return response
+
+# Explicit OPTIONS handler for all routes
+@app.route('/detect', methods=['OPTIONS'])
+@app.route('/health', methods=['OPTIONS'])
+@app.route('/classes', methods=['OPTIONS'])
+@app.route('/', methods=['OPTIONS'])
+def handle_options():
+    """Explicitly handle OPTIONS requests"""
+    response = app.make_default_options_response()
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = '*'
+    return response
 
 # ==================== HUGGING FACE LOADING FUNCTION ====================
 def load_model_from_huggingface():
