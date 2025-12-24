@@ -1,0 +1,14 @@
+# Core requirements - REMOVED TensorFlow/Keras (2GB+)
+Flask==3.1.0
+flask-cors==4.0.0
+numpy==1.26.4
+torch==2.9.1
+torchvision==0.24.1
+opencv-python-headless==4.10.0.84
+Pillow==10.4.0
+ultralytics==8.3.240
+gunicorn==21.2.0
+gevent==24.10.1
+huggingface-hub==0.19.4
+requests==2.32.5
+pyyaml==6.0.1
