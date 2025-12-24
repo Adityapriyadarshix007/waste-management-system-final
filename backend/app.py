@@ -768,7 +768,7 @@ def health_check():
     """Health check - responds immediately without loading model"""
     return jsonify({
         'status': 'healthy',
-        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+        'timestamp': time.time(),  # CHANGED: Use time.time() for speed
         'app_ready': True,
         'model_loaded': yolo_model is not None,
         'api_version': '1.0',
@@ -1163,18 +1163,15 @@ def internal_error(error):
 # Only run Flask dev server if running directly (not imported by Gunicorn)
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
-    host = '127.0.0.1'
     
     print(f"\n{'='*70}")
     print(f"🌐 STARTING FLASK DEV SERVER (Local Only)")
     print(f"{'='*70}")
-    print(f"📡 Host: {host}")
     print(f"🔢 Port: {port}")
     print(f"⚠️  WARNING: This is for LOCAL DEVELOPMENT only!")
-    print(f"   Use 'gunicorn app:app' for production")
+    print(f"   For production, use: gunicorn --bind 0.0.0.0:$PORT --workers 1 --timeout 120 app:app")
+    print(f"{'='*70}")
     
-    # Load model for local development
-    print("\n🌐 Loading model for local development...")
-    load_model_lazy()
-    
-    app.run(host=host, port=port, debug=True)
+    # IMPORTANT: DO NOT load model in production mode
+    # In production, Gunicorn imports 'app' and this block is NOT executed
+    app.run(host='127.0.0.1', port=port, debug=False)  # debug=False to avoid double loading
