@@ -22,7 +22,7 @@ except ImportError:
     print("⚠️  huggingface-hub not installed. Install with: pip install huggingface-hub")
 
 print("\n" + "="*70)
-print("🚀 STARTING WASTE DETECTION API (YOLOv8m First, Custom Fallback)")
+print("🚀 STARTING WASTE DETECTION API (Lazy Loading)")
 print("="*70)
 
 # ==================== ENVIRONMENT INFO ====================
@@ -52,10 +52,15 @@ for i, model in enumerate(HUGGING_FACE_MODELS):
     print(f"   {i+1}. {model['name']} ({model['type'].upper()})")
     print(f"      {model['description']}")
 
+# Initialize as None - will be loaded lazily
 yolo_model = None
 MODEL_PATH = None
 model_loaded = False
 model_hash = None
+
+# ==================== FLASK APP ====================
+app = Flask(__name__)
+CORS(app)
 
 # ==================== HUGGING FACE LOADING FUNCTION ====================
 def load_model_from_huggingface():
@@ -149,7 +154,7 @@ def load_model_from_huggingface():
         # If Hugging Face loading fails, try local fallback
         print("\n🔄 Hugging Face loading failed, trying local models...")
         
-        # YOUR ORIGINAL LOCAL MODEL SEARCH CODE
+        # LOCAL MODEL SEARCH CODE
         LOCAL_MODEL_PATHS = [
             Path("high_accuracy_training/waste_detector_pro/weights/best.pt"),
             Path("../runs/detect/train5/weights/best.pt"),
@@ -271,20 +276,25 @@ def load_model_from_huggingface():
         traceback.print_exc()
         return False
 
-# ==================== INITIALIZE MODEL ====================
-print("\n🌐 Connecting to Hugging Face Hub...")
-model_loaded = load_model_from_huggingface()
-
-print("\n" + "="*70)
-if model_loaded:
-    print(f"🚀 MODEL READY: {MODEL_PATH} ({model_hash})")
-else:
-    print("⚠️  NO MODEL LOADED - Limited functionality")
-print("="*70 + "\n")
-
-# ==================== FLASK APP ====================
-app = Flask(__name__)
-CORS(app)
+# ==================== LAZY MODEL LOADER ====================
+def load_model_lazy():
+    """Load model only when needed (not at startup)"""
+    global yolo_model, MODEL_PATH, model_loaded, model_hash
+    
+    if yolo_model is None:
+        print("\n" + "="*70)
+        print("🌐 LAZY LOADING MODEL (First Request)")
+        print("="*70)
+        
+        model_loaded = load_model_from_huggingface()
+        
+        if model_loaded:
+            print(f"🚀 MODEL READY: {MODEL_PATH} ({model_hash})")
+        else:
+            print("⚠️  NO MODEL LOADED - Limited functionality")
+        print("="*70 + "\n")
+    
+    return model_loaded
 
 # ==================== WASTE CONFIGURATION ====================
 CLASS_CONFIG = {
@@ -729,80 +739,15 @@ def optimize_image_for_detection(image_np, target_size=640):
     
     return image_np
 
-# ==================== TRAINING FUNCTION ====================
-@app.route('/train-model', methods=['POST'])
-def train_model():
-    """Train a new YOLO model with current data"""
-    try:
-        if not model_loaded:
-            return jsonify({
-                'success': False,
-                'error': 'No base model loaded for training'
-            })
-        
-        print("\n🎯 Starting model training...")
-        
-        # Create dataset.yaml for training
-        dataset_config = {
-            'path': os.path.abspath('waste_dataset'),
-            'train': 'images/train',
-            'val': 'images/val',
-            'nc': 4,
-            'names': ['biodegradable', 'recyclable', 'hazardous', 'non_recyclable']
-        }
-        
-        # Ensure dataset directory exists
-        os.makedirs('waste_dataset', exist_ok=True)
-        os.makedirs('waste_dataset/images/train', exist_ok=True)
-        os.makedirs('waste_dataset/images/val', exist_ok=True)
-        os.makedirs('waste_dataset/labels/train', exist_ok=True)
-        os.makedirs('waste_dataset/labels/val', exist_ok=True)
-        
-        import yaml
-        with open('waste_dataset/dataset.yaml', 'w') as f:
-            yaml.dump(dataset_config, f)
-        
-        # Training configuration
-        training_args = {
-            'data': 'waste_dataset/dataset.yaml',
-            'epochs': 50,
-            'imgsz': 640,
-            'batch': 16,
-            'save': True,
-            'save_period': 10,
-            'project': 'waste_training',
-            'name': 'waste_detector_v2',
-            'exist_ok': True,
-        }
-        
-        # Start training
-        print("🤖 Training YOLO model...")
-        results = yolo_model.train(**training_args)
-        
-        return jsonify({
-            'success': True,
-            'message': 'Model training started',
-            'training_id': 'waste_detector_v2',
-            'epochs': 50,
-            'status': 'training'
-        })
-        
-    except Exception as e:
-        print(f"Training error: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        })
-
 # ==================== API ROUTES ====================
 @app.route('/')
 def home():
     return jsonify({
         'message': 'Waste Classification API',
-        'model_status': 'LOADED' if model_loaded else 'NOT LOADED',
-        'model_path': MODEL_PATH,
+        'model_status': 'LOADED' if yolo_model is not None else 'NOT LOADED (Lazy Loading)',
+        'model_path': MODEL_PATH if yolo_model is not None else 'Will load on first detection',
         'model_hash': model_hash,
-        'classes': list(yolo_model.names.values()) if model_loaded else [],
+        'classes': list(yolo_model.names.values()) if yolo_model is not None else [],
         'available_classes': CLASS_CONFIG,
         'waste_bins': WASTE_BINS,
         'waste_guide': WASTE_GUIDE,
@@ -820,24 +765,26 @@ def home():
 
 @app.route('/health', methods=['GET'])
 def health_check():
+    """Health check - responds immediately without loading model"""
     return jsonify({
         'status': 'healthy',
         'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-        'model_loaded': model_loaded,
-        'model_path': MODEL_PATH,
-        'model_hash': model_hash,
-        'available_classes': list(yolo_model.names.values()) if model_loaded else [],
-        'bins_configured': len(WASTE_BINS),
-        'biodegradable_keywords_count': len(BIODEGRADABLE_KEYWORDS)
+        'app_ready': True,
+        'model_loaded': yolo_model is not None,
+        'api_version': '1.0',
+        'ready_for_requests': True
     })
 
 @app.route('/model-info', methods=['GET'])
 def model_info():
     """Get detailed model information"""
-    if not model_loaded:
+    # Load model if not already loaded
+    if yolo_model is None:
         return jsonify({
-            'status': 'no_model',
-            'message': 'No model is currently loaded'
+            'status': 'not_loaded_yet',
+            'message': 'Model will load on first detection request',
+            'model_available': True,
+            'lazy_loading': True
         })
     
     model_data = {
@@ -871,9 +818,21 @@ def model_info():
 @app.route('/classes', methods=['GET'])
 def get_classes():
     """Get available waste classes"""
+    # Load model if not already loaded
+    if yolo_model is None:
+        return jsonify({
+            'success': True,
+            'model_loaded': False,
+            'message': 'Model will load on first detection',
+            'frontend_classes': CLASS_CONFIG,
+            'waste_bins': WASTE_BINS,
+            'waste_guide': WASTE_GUIDE,
+        })
+    
     return jsonify({
         'success': True,
-        'model_classes': list(yolo_model.names.values()) if model_loaded else [],
+        'model_loaded': True,
+        'model_classes': list(yolo_model.names.values()),
         'frontend_classes': CLASS_CONFIG,
         'waste_bins': WASTE_BINS,
         'waste_guide': WASTE_GUIDE,
@@ -963,13 +922,13 @@ def test_endpoint():
     return jsonify({
         'success': True,
         'message': 'API is working!',
-        'model_loaded': model_loaded,
-        'model_classes': list(yolo_model.names.values()) if model_loaded else [],
+        'model_loaded': yolo_model is not None,
+        'model_classes': list(yolo_model.names.values()) if yolo_model is not None else [],
         'class_config': CLASS_CONFIG,
         'bin_config': WASTE_BINS,
         'waste_guide': WASTE_GUIDE,
         'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-        'model_path': MODEL_PATH,
+        'model_path': MODEL_PATH if yolo_model is not None else 'Will load on first request',
         'biodegradable_detection': 'ENABLED - All fruits/vegetables will be classified as biodegradable'
     })
 
@@ -977,10 +936,11 @@ def test_endpoint():
 def detect_from_base64():
     """MAIN ENDPOINT FOR REACT - Accepts base64 image"""
     try:
-        if not model_loaded:
+        # Load model only when needed
+        if not load_model_lazy():
             return jsonify({
                 'success': False,
-                'error': 'Model not loaded. Check server console.',
+                'error': 'Model failed to load',
                 'detections': [],
                 'model_info': {'loaded': False}
             }), 500
@@ -993,7 +953,7 @@ def detect_from_base64():
         print(f"📦 Request received at: {time.strftime('%H:%M:%S')}")
         
         # Show which model is being used
-        model_name = "YOLOv8m (80+ classes)" if "yolov8m" in MODEL_PATH.lower() else "Custom waste model (2 classes)"
+        model_name = "YOLOv8m (80+ classes)" if "yolov8m" in str(MODEL_PATH).lower() else "Custom waste model (2 classes)"
         print(f"🔧 Using: {model_name}")
         print(f"🔧 Biodegradable detection: ENABLED (Enhanced mapping)")
         
@@ -1095,7 +1055,7 @@ def detect_from_base64():
         
         # Add tips if no detections
         if len(detections) == 0:
-            if "yolov8m" in MODEL_PATH.lower():
+            if "yolov8m" in str(MODEL_PATH).lower():
                 response['tips'] = [
                     'Try pointing camera at: fruits, vegetables, plastic bottles, cans, etc.',
                     'Ensure good lighting and clear focus',
@@ -1121,8 +1081,74 @@ def detect_from_base64():
             'success': False,
             'error': str(e),
             'detections': [],
-            'model_info': {'loaded': model_loaded}
+            'model_info': {'loaded': yolo_model is not None}
         }), 500
+
+# ==================== TRAINING FUNCTION ====================
+@app.route('/train-model', methods=['POST'])
+def train_model():
+    """Train a new YOLO model with current data"""
+    try:
+        # Load model if not already loaded
+        if not load_model_lazy():
+            return jsonify({
+                'success': False,
+                'error': 'No base model loaded for training'
+            })
+        
+        print("\n🎯 Starting model training...")
+        
+        # Create dataset.yaml for training
+        dataset_config = {
+            'path': os.path.abspath('waste_dataset'),
+            'train': 'images/train',
+            'val': 'images/val',
+            'nc': 4,
+            'names': ['biodegradable', 'recyclable', 'hazardous', 'non_recyclable']
+        }
+        
+        # Ensure dataset directory exists
+        os.makedirs('waste_dataset', exist_ok=True)
+        os.makedirs('waste_dataset/images/train', exist_ok=True)
+        os.makedirs('waste_dataset/images/val', exist_ok=True)
+        os.makedirs('waste_dataset/labels/train', exist_ok=True)
+        os.makedirs('waste_dataset/labels/val', exist_ok=True)
+        
+        import yaml
+        with open('waste_dataset/dataset.yaml', 'w') as f:
+            yaml.dump(dataset_config, f)
+        
+        # Training configuration
+        training_args = {
+            'data': 'waste_dataset/dataset.yaml',
+            'epochs': 50,
+            'imgsz': 640,
+            'batch': 16,
+            'save': True,
+            'save_period': 10,
+            'project': 'waste_training',
+            'name': 'waste_detector_v2',
+            'exist_ok': True,
+        }
+        
+        # Start training
+        print("🤖 Training YOLO model...")
+        results = yolo_model.train(**training_args)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Model training started',
+            'training_id': 'waste_detector_v2',
+            'epochs': 50,
+            'status': 'training'
+        })
+        
+    except Exception as e:
+        print(f"Training error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
 
 # ==================== ERROR HANDLERS ====================
 @app.errorhandler(404)
@@ -1134,18 +1160,21 @@ def internal_error(error):
     return jsonify({'error': 'Internal server error', 'success': False}), 500
 
 # ==================== MAIN EXECUTION ====================
+# Only run Flask dev server if running directly (not imported by Gunicorn)
 if __name__ == '__main__':
-    # Railway always sets PORT environment variable
     port = int(os.environ.get('PORT', 5001))
+    host = '127.0.0.1'
     
     print(f"\n{'='*70}")
-    print(f"🚀 STARTING FLASK SERVER")
+    print(f"🌐 STARTING FLASK DEV SERVER (Local Only)")
     print(f"{'='*70}")
-    print(f"📡 Host: 0.0.0.0")
+    print(f"📡 Host: {host}")
     print(f"🔢 Port: {port}")
-    print(f"🎯 Model: YOLOv8m (80 COCO classes → Waste mapping)")
-    print(f"🌐 Access: https://waste-management-system-final-production-eb97.up.railway.app")
-    print(f"{'='*70}\n")
+    print(f"⚠️  WARNING: This is for LOCAL DEVELOPMENT only!")
+    print(f"   Use 'gunicorn app:app' for production")
     
-    # Start the Flask server
-    app.run(host='0.0.0.0', port=port, debug=False)
+    # Load model for local development
+    print("\n🌐 Loading model for local development...")
+    load_model_lazy()
+    
+    app.run(host=host, port=port, debug=True)
