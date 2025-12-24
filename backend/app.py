@@ -13,8 +13,16 @@ from pathlib import Path
 import hashlib
 import random
 
+# Add this with your other imports at the top
+try:
+    from huggingface_hub import hf_hub_download
+    HF_HUB_AVAILABLE = True
+except ImportError:
+    HF_HUB_AVAILABLE = False
+    print("⚠️  huggingface-hub not installed. Install with: pip install huggingface-hub")
+
 print("\n" + "="*70)
-print("🚀 STARTING WASTE DETECTION API")
+print("🚀 STARTING WASTE DETECTION API (YOLOv8m First, Custom Fallback)")
 print("="*70)
 
 # ==================== ENVIRONMENT INFO ====================
@@ -22,158 +30,254 @@ print(f"🐍 Python {sys.version}")
 print(f"🖥️  Platform: {sys.platform}")
 print(f"📁 Working Directory: {os.getcwd()}")
 
-# ==================== MODEL LOADING ====================
-# Try multiple model paths in order of preference
-MODEL_PATHS = [
-    Path("high_accuracy_training/waste_detector_pro/weights/best.pt"),
-    Path("../runs/detect/train5/weights/best.pt"),
-    Path("runs/detect/train/weights/best.pt"),
-    Path("best.pt"),
-    Path("yolov8m.pt"),
+# ==================== HUGGING FACE MODEL LOADING ====================
+# PRIORITY ORDER: yolov8m.pt FIRST, then custom model
+HUGGING_FACE_MODELS = [
+    {
+        "name": "yolov8m.pt",
+        "path": "Ultralytics/yolov8m.pt",
+        "type": "official",
+        "description": "Official YOLOv8 medium model (80+ COCO classes)"
+    },
+    {
+        "name": "best.pt", 
+        "path": "Eeeesha/waste-detector-model/best.pt",
+        "type": "custom",
+        "description": "Custom waste detection model (2 classes)"
+    }
 ]
 
-# Alternative model names to search for
-ALTERNATIVE_NAMES = ["best.pt", "last.pt", "yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt"]
-
-print(f"\n🔍 Looking for models at:")
-for path in MODEL_PATHS:
-    print(f"   - {path}")
+print(f"\n🔍 Model Loading Priority:")
+for i, model in enumerate(HUGGING_FACE_MODELS):
+    print(f"   {i+1}. {model['name']} ({model['type'].upper()})")
+    print(f"      {model['description']}")
 
 yolo_model = None
 MODEL_PATH = None
 model_loaded = False
 model_hash = None
 
-def find_available_models():
-    """Search for all available model files"""
-    found_models = []
+# ==================== HUGGING FACE LOADING FUNCTION ====================
+def load_model_from_huggingface():
+    """Load YOLO model from Hugging Face Hub with fallbacks"""
+    global yolo_model, MODEL_PATH, model_loaded, model_hash
     
-    # Check primary paths first
-    for path in MODEL_PATHS:
-        if path.exists():
-            size_mb = path.stat().st_size / 1024 / 1024
-            found_models.append({
-                'path': path,
-                'priority': 'PRIMARY',
-                'size_mb': size_mb
-            })
-    
-    # Search in common directories
-    search_dirs = [
-        Path("."),
-        Path("high_accuracy_training"),
-        Path("runs/detect"),
-        Path("../runs/detect"),
-        Path("models"),
-        Path("../models"),
-    ]
-    
-    for dir_path in search_dirs:
-        if dir_path.exists():
-            for alt_name in ALTERNATIVE_NAMES:
-                try:
-                    for pt_file in dir_path.rglob(f"*{alt_name}"):
-                        if any(str(pt_file) == str(m['path']) for m in found_models):
-                            continue
-                        size_mb = pt_file.stat().st_size / 1024 / 1024
-                        found_models.append({
-                            'path': pt_file,
-                            'priority': 'SEARCHED',
-                            'size_mb': size_mb
-                        })
-                except Exception as e:
-                    continue
-    
-    return found_models
-
-def calculate_model_hash(model_path):
-    """Calculate hash of model file for caching"""
     try:
-        with open(model_path, 'rb') as f:
-            file_hash = hashlib.md5()
-            chunk = f.read(8192)
-            while chunk:
-                file_hash.update(chunk)
-                chunk = f.read(8192)
-            return file_hash.hexdigest()[:8]
-    except:
-        return "unknown"
+        from ultralytics import YOLO, __version__ as ultralytics_version
+        print(f"✅ ultralytics v{ultralytics_version} imported successfully")
+        
+        # Try loading models in priority order
+        for model_info in HUGGING_FACE_MODELS:
+            try:
+                model_path = model_info['path']
+                print(f"\n🔄 Attempting to load: {model_path}")
+                
+                # Handle yolov8m.pt with direct URL
+                if model_info['name'] == "yolov8m.pt":
+                    print(f"📥 Loading YOLOv8m with 80+ COCO classes...")
+                    # Use direct GitHub URL for reliability
+                    yolo_model = YOLO("https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8m.pt")
+                    MODEL_PATH = "Ultralytics/yolov8m.pt"
+                    model_source = "huggingface_official"
+                    
+                # Handle custom model from Hugging Face
+                elif model_info['name'] == "best.pt":
+                    print(f"📥 Loading custom waste detection model...")
+                    
+                    # Parse repo_id and filename
+                    if "/best.pt" in model_path:
+                        repo_id = model_path.replace("/best.pt", "")
+                        filename = "best.pt"
+                    else:
+                        parts = model_path.split("/")
+                        if len(parts) >= 2:
+                            repo_id = "/".join(parts[:-1])
+                            filename = parts[-1]
+                        else:
+                            raise ValueError(f"Invalid Hugging Face path: {model_path}")
+                    
+                    print(f"   Repository: {repo_id}")
+                    
+                    # Download from Hugging Face
+                    try:
+                        local_model_path = hf_hub_download(
+                            repo_id=repo_id,
+                            filename=filename,
+                            cache_dir="./hf_cache",
+                            force_download=False
+                        )
+                        
+                        print(f"✅ Model downloaded to: {local_model_path}")
+                        yolo_model = YOLO(local_model_path)
+                        MODEL_PATH = local_model_path
+                        model_source = "huggingface_custom"
+                        
+                    except Exception as download_error:
+                        print(f"❌ Download failed: {str(download_error)[:100]}")
+                        continue
+                
+                else:
+                    # For any other model format
+                    yolo_model = YOLO(model_path)
+                    MODEL_PATH = model_path
+                    model_source = "direct"
+                
+                model_loaded = True
+                model_hash = hashlib.md5(str(MODEL_PATH).encode()).hexdigest()[:8]
+                
+                # Display model info
+                print(f"✅ {model_info['name']} loaded successfully!")
+                print(f"📋 Model classes: {yolo_model.names}")
+                print(f"🎯 Total classes: {len(yolo_model.names)}")
+                print(f"📦 Source: {model_source}")
+                print(f"🔢 Hash: {model_hash}")
+                
+                # Quick validation
+                print("🧪 Running model validation...")
+                test_img = np.zeros((100, 100, 3), dtype=np.uint8)
+                test_results = yolo_model(test_img, conf=0.1, verbose=False)
+                print("✅ Model validation passed")
+                
+                return True
+                
+            except Exception as e:
+                print(f"⚠️  Failed to load {model_info['name']}: {str(e)[:150]}")
+                if model_info['name'] == "yolov8m.pt":
+                    print("   Trying next model (custom best.pt)...")
+                continue
+        
+        # If Hugging Face loading fails, try local fallback
+        print("\n🔄 Hugging Face loading failed, trying local models...")
+        
+        # YOUR ORIGINAL LOCAL MODEL SEARCH CODE
+        LOCAL_MODEL_PATHS = [
+            Path("high_accuracy_training/waste_detector_pro/weights/best.pt"),
+            Path("../runs/detect/train5/weights/best.pt"),
+            Path("runs/detect/train/weights/best.pt"),
+            Path("best.pt"),
+            Path("yolov8m.pt"),
+        ]
+        
+        ALTERNATIVE_NAMES = ["best.pt", "last.pt", "yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt"]
+        
+        def find_available_models():
+            """Search for all available model files"""
+            found_models = []
+            
+            for path in LOCAL_MODEL_PATHS:
+                if path.exists():
+                    size_mb = path.stat().st_size / 1024 / 1024
+                    found_models.append({
+                        'path': path,
+                        'priority': 'PRIMARY',
+                        'size_mb': size_mb
+                    })
+            
+            search_dirs = [
+                Path("."),
+                Path("high_accuracy_training"),
+                Path("runs/detect"),
+                Path("../runs/detect"),
+                Path("models"),
+                Path("../models"),
+            ]
+            
+            for dir_path in search_dirs:
+                if dir_path.exists():
+                    for alt_name in ALTERNATIVE_NAMES:
+                        try:
+                            for pt_file in dir_path.rglob(f"*{alt_name}"):
+                                if any(str(pt_file) == str(m['path']) for m in found_models):
+                                    continue
+                                size_mb = pt_file.stat().st_size / 1024 / 1024
+                                found_models.append({
+                                    'path': pt_file,
+                                    'priority': 'SEARCHED',
+                                    'size_mb': size_mb
+                                })
+                        except Exception:
+                            continue
+            
+            return found_models
+        
+        def calculate_model_hash(model_path):
+            """Calculate hash of model file for caching"""
+            try:
+                with open(model_path, 'rb') as f:
+                    file_hash = hashlib.md5()
+                    chunk = f.read(8192)
+                    while chunk:
+                        file_hash.update(chunk)
+                        chunk = f.read(8192)
+                    return file_hash.hexdigest()[:8]
+            except:
+                return "unknown"
+        
+        # Try loading local models
+        print("\n📂 Searching for local model files...")
+        available_models = find_available_models()
+        
+        if available_models:
+            print(f"\n📊 Found {len(available_models)} local model(s):")
+            for i, model_info in enumerate(available_models):
+                print(f"   {i+1}. {model_info['path']} ({model_info['size_mb']:.1f} MB)")
+            
+            for model_info in sorted(available_models, key=lambda x: -x['size_mb']):
+                try:
+                    model_path = model_info['path']
+                    print(f"\n🔄 Attempting to load local: {model_path}")
+                    
+                    yolo_model = YOLO(str(model_path))
+                    MODEL_PATH = str(model_path)
+                    model_loaded = True
+                    model_hash = calculate_model_hash(model_path)
+                    
+                    print(f"✅ Local model loaded successfully!")
+                    print(f"📋 Model classes: {yolo_model.names}")
+                    print(f"📦 File size: {model_info['size_mb']:.1f} MB")
+                    
+                    # Quick validation
+                    test_img = np.zeros((100, 100, 3), dtype=np.uint8)
+                    test_results = yolo_model(test_img, conf=0.1, verbose=False)
+                    print("✅ Model validation passed")
+                    
+                    return True
+                    
+                except Exception as e:
+                    print(f"⚠️  Failed to load local {model_path}: {str(e)[:100]}")
+                    continue
+        
+        # Final fallback - auto-download base model
+        if not model_loaded:
+            print("\n🔄 No models available, attempting to auto-download base model...")
+            try:
+                yolo_model = YOLO('yolov8m.pt')
+                MODEL_PATH = "yolov8m.pt (auto-downloaded)"
+                model_loaded = True
+                model_hash = "auto-downloaded"
+                print("✅ Base YOLOv8m model loaded (auto-downloaded)")
+                print("💡 This model has 80+ COCO classes for object detection")
+                return True
+            except Exception as e:
+                print(f"❌ Cannot load base model: {e}")
+                return False
+                
+    except ImportError as e:
+        print(f"\n❌ CANNOT IMPORT ULTRALYTICS: {e}")
+        print("\n💡 Install with: pip install ultralytics huggingface-hub")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n❌ UNEXPECTED ERROR: {e}")
+        traceback.print_exc()
+        return False
 
-try:
-    from ultralytics import YOLO, __version__ as ultralytics_version
-    print(f"✅ ultralytics v{ultralytics_version} imported successfully")
-    
-    # Find all available models
-    print("\n📂 Searching for model files...")
-    available_models = find_available_models()
-    
-    if available_models:
-        print(f"\n📊 Found {len(available_models)} model(s):")
-        for i, model_info in enumerate(available_models):
-            print(f"   {i+1}. {model_info['path']} ({model_info['size_mb']:.1f} MB) [{model_info['priority']}]")
-    else:
-        print("\n❌ No model files found locally!")
-    
-    # Try loading models in priority order
-    for model_info in sorted(available_models, 
-                             key=lambda x: (0 if x['priority'] == 'PRIMARY' else 1, -x['size_mb'])):
-        try:
-            model_path = model_info['path']
-            print(f"\n🔄 Attempting to load: {model_path}")
-            
-            yolo_model = YOLO(str(model_path))
-            MODEL_PATH = str(model_path)
-            model_loaded = True
-            model_hash = calculate_model_hash(model_path)
-            
-            # Test the model with minimal validation
-            print(f"✅ Model loaded successfully!")
-            print(f"📋 Model classes: {yolo_model.names}")
-            print(f"🎯 Model type: {yolo_model.task}")
-            print(f"📦 File size: {model_info['size_mb']:.1f} MB")
-            print(f"🔢 Hash: {model_hash}")
-            
-            # Test with a small dummy inference
-            print("🧪 Running quick model validation...")
-            test_img = np.zeros((100, 100, 3), dtype=np.uint8)
-            test_results = yolo_model(test_img, conf=0.1, verbose=False)
-            print("✅ Model validation passed")
-            
-            break
-            
-        except Exception as e:
-            print(f"⚠️  Failed to load {model_path}: {str(e)[:100]}")
-            continue
-    
-    # If no local model found, try to use/download base model
-    if not model_loaded:
-        print("\n🔄 No local models available, attempting to use base model...")
-        try:
-            yolo_model = YOLO('yolov8m.pt')
-            MODEL_PATH = "yolov8m.pt (auto-downloaded)"
-            model_loaded = True
-            model_hash = "auto-downloaded"
-            print("✅ Base YOLOv8m model loaded (auto-downloaded)")
-            print("💡 Train your own model for better waste detection!")
-        except Exception as e:
-            print(f"❌ Cannot load base model: {e}")
-            print("   Check your internet connection or install models manually")
-            
-except ImportError as e:
-    print(f"\n❌ CANNOT IMPORT ULTRALYTICS: {e}")
-    print("\n💡 Install with:")
-    print("   pip install ultralytics")
-    print("   or")
-    print("   pip install ultralytics==8.0.0")
-    sys.exit(1)
-except Exception as e:
-    print(f"\n❌ UNEXPECTED ERROR: {e}")
-    traceback.print_exc()
-    sys.exit(1)
+# ==================== INITIALIZE MODEL ====================
+print("\n🌐 Connecting to Hugging Face Hub...")
+model_loaded = load_model_from_huggingface()
 
 print("\n" + "="*70)
 if model_loaded:
-    print(f"🚀 MODEL READY: {Path(MODEL_PATH).name} ({model_hash})")
+    print(f"🚀 MODEL READY: {MODEL_PATH} ({model_hash})")
 else:
     print("⚠️  NO MODEL LOADED - Limited functionality")
 print("="*70 + "\n")
@@ -183,7 +287,6 @@ app = Flask(__name__)
 CORS(app)
 
 # ==================== WASTE CONFIGURATION ====================
-# FIXED: Enhanced category mapping for better fruit/vegetable detection
 CLASS_CONFIG = {
     "biodegradable": {
         "name": "Biodegradable",
@@ -374,145 +477,50 @@ UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # ==================== ENHANCED CATEGORY MAPPING ====================
-# FIXED: Comprehensive mapping for all types of fruits and vegetables
 BIODEGRADABLE_KEYWORDS = {
-    # Fruits
-    'apple': 'Apple',
-    'banana': 'Banana',
-    'orange': 'Orange',
-    'pear': 'Pear',
-    'peach': 'Peach',
-    'grape': 'Grape',
-    'berry': 'Berry',
-    'strawberry': 'Strawberry',
-    'blueberry': 'Blueberry',
-    'watermelon': 'Watermelon',
-    'melon': 'Melon',
-    'pineapple': 'Pineapple',
-    'mango': 'Mango',
-    'kiwi': 'Kiwi',
-    'lemon': 'Lemon',
-    'lime': 'Lime',
-    'coconut': 'Coconut',
-    'avocado': 'Avocado',
-    'papaya': 'Papaya',
-    'guava': 'Guava',
-    'plum': 'Plum',
-    'cherry': 'Cherry',
-    'apricot': 'Apricot',
-    'fig': 'Fig',
-    'date': 'Date',
-    'pomegranate': 'Pomegranate',
-    
-    # Vegetables
-    'broccoli': 'Broccoli',
-    'carrot': 'Carrot',
-    'potato': 'Potato',
-    'tomato': 'Tomato',
-    'onion': 'Onion',
-    'garlic': 'Garlic',
-    'cucumber': 'Cucumber',
-    'lettuce': 'Lettuce',
-    'spinach': 'Spinach',
-    'cabbage': 'Cabbage',
-    'cauliflower': 'Cauliflower',
-    'pepper': 'Pepper',
-    'capsicum': 'Capsicum',
-    'corn': 'Corn',
-    'pea': 'Pea',
-    'bean': 'Bean',
-    'celery': 'Celery',
-    'radish': 'Radish',
-    'turnip': 'Turnip',
-    'beet': 'Beet',
-    'eggplant': 'Eggplant',
-    'zucchini': 'Zucchini',
-    'pumpkin': 'Pumpkin',
-    'squash': 'Squash',
-    
-    # Other biodegradable
-    'food': 'Food Waste',
-    'fruit': 'Fruit',
-    'vegetable': 'Vegetable',
-    'organic': 'Organic Waste',
-    'compost': 'Compost',
-    'leaf': 'Leaves',
-    'grass': 'Grass',
-    'wood': 'Wood',
-    'paper': 'Paper',
-    'bread': 'Bread',
-    'cake': 'Cake',
-    'pizza': 'Pizza',
-    'meat': 'Meat',
-    'fish': 'Fish',
-    'rice': 'Rice',
-    'pasta': 'Pasta',
-    'egg': 'Egg',
-    'coffee': 'Coffee',
-    'tea': 'Tea',
-    'plant': 'Plant',
-    'flower': 'Flower',
-    'seed': 'Seed',
-    'nut': 'Nut',
+    'apple': 'Apple', 'banana': 'Banana', 'orange': 'Orange', 'pear': 'Pear',
+    'peach': 'Peach', 'grape': 'Grape', 'berry': 'Berry', 'strawberry': 'Strawberry',
+    'blueberry': 'Blueberry', 'watermelon': 'Watermelon', 'melon': 'Melon',
+    'pineapple': 'Pineapple', 'mango': 'Mango', 'kiwi': 'Kiwi', 'lemon': 'Lemon',
+    'lime': 'Lime', 'coconut': 'Coconut', 'avocado': 'Avocado', 'papaya': 'Papaya',
+    'guava': 'Guava', 'plum': 'Plum', 'cherry': 'Cherry', 'apricot': 'Apricot',
+    'fig': 'Fig', 'date': 'Date', 'pomegranate': 'Pomegranate', 'broccoli': 'Broccoli',
+    'carrot': 'Carrot', 'potato': 'Potato', 'tomato': 'Tomato', 'onion': 'Onion',
+    'garlic': 'Garlic', 'cucumber': 'Cucumber', 'lettuce': 'Lettuce', 'spinach': 'Spinach',
+    'cabbage': 'Cabbage', 'cauliflower': 'Cauliflower', 'pepper': 'Pepper',
+    'capsicum': 'Capsicum', 'corn': 'Corn', 'pea': 'Pea', 'bean': 'Bean',
+    'celery': 'Celery', 'radish': 'Radish', 'turnip': 'Turnip', 'beet': 'Beet',
+    'eggplant': 'Eggplant', 'zucchini': 'Zucchini', 'pumpkin': 'Pumpkin', 'squash': 'Squash',
+    'food': 'Food Waste', 'fruit': 'Fruit', 'vegetable': 'Vegetable', 'organic': 'Organic Waste',
+    'compost': 'Compost', 'leaf': 'Leaves', 'grass': 'Grass', 'wood': 'Wood',
+    'paper': 'Paper', 'bread': 'Bread', 'cake': 'Cake', 'pizza': 'Pizza',
+    'meat': 'Meat', 'fish': 'Fish', 'rice': 'Rice', 'pasta': 'Pasta',
+    'egg': 'Egg', 'coffee': 'Coffee', 'tea': 'Tea', 'plant': 'Plant',
+    'flower': 'Flower', 'seed': 'Seed', 'nut': 'Nut',
 }
 
 RECYCLABLE_KEYWORDS = {
-    'plastic': 'Plastic',
-    'bottle': 'Bottle',
-    'can': 'Can',
-    'glass': 'Glass',
-    'jar': 'Jar',
-    'cardboard': 'Cardboard',
-    'box': 'Box',
-    'paper': 'Paper',
-    'newspaper': 'Newspaper',
-    'magazine': 'Magazine',
-    'aluminum': 'Aluminum',
-    'metal': 'Metal',
-    'container': 'Container',
-    'tin': 'Tin',
-    'envelope': 'Envelope',
+    'plastic': 'Plastic', 'bottle': 'Bottle', 'can': 'Can', 'glass': 'Glass',
+    'jar': 'Jar', 'cardboard': 'Cardboard', 'box': 'Box', 'paper': 'Paper',
+    'newspaper': 'Newspaper', 'magazine': 'Magazine', 'aluminum': 'Aluminum',
+    'metal': 'Metal', 'container': 'Container', 'tin': 'Tin', 'envelope': 'Envelope',
     'cup': 'Cup',
 }
 
 HAZARDOUS_KEYWORDS = {
-    'battery': 'Battery',
-    'electronic': 'Electronic',
-    'phone': 'Phone',
-    'laptop': 'Laptop',
-    'medicine': 'Medicine',
-    'chemical': 'Chemical',
-    'paint': 'Paint',
-    'oil': 'Oil',
-    'toxic': 'Toxic',
-    'thermometer': 'Thermometer',
-    'bulb': 'Bulb',
-    'light': 'Light',
-    'cleaner': 'Cleaner',
-    'pesticide': 'Pesticide',
-    'solvent': 'Solvent',
-    'mercury': 'Mercury',
+    'battery': 'Battery', 'electronic': 'Electronic', 'phone': 'Phone',
+    'laptop': 'Laptop', 'medicine': 'Medicine', 'chemical': 'Chemical',
+    'paint': 'Paint', 'oil': 'Oil', 'toxic': 'Toxic', 'thermometer': 'Thermometer',
+    'bulb': 'Bulb', 'light': 'Light', 'cleaner': 'Cleaner', 'pesticide': 'Pesticide',
+    'solvent': 'Solvent', 'mercury': 'Mercury',
 }
 
 NON_RECYCLABLE_KEYWORDS = {
-    'plastic_bag': 'Plastic Bag',
-    'bag': 'Bag',
-    'styrofoam': 'Styrofoam',
-    'foam': 'Foam',
-    'ceramic': 'Ceramic',
-    'broken': 'Broken',
-    'diaper': 'Diaper',
-    'sanitary': 'Sanitary',
-    'tissue': 'Tissue',
-    'wipe': 'Wipe',
-    'cigarette': 'Cigarette',
-    'wrapper': 'Wrapper',
-    'chip': 'Chip',
-    'composite': 'Composite',
-    'waxed': 'Waxed',
-    'mirror': 'Mirror',
-    'glassware': 'Glassware',
-    'lightbulb': 'Lightbulb',
+    'plastic_bag': 'Plastic Bag', 'bag': 'Bag', 'styrofoam': 'Styrofoam',
+    'foam': 'Foam', 'ceramic': 'Ceramic', 'broken': 'Broken', 'diaper': 'Diaper',
+    'sanitary': 'Sanitary', 'tissue': 'Tissue', 'wipe': 'Wipe', 'cigarette': 'Cigarette',
+    'wrapper': 'Wrapper', 'chip': 'Chip', 'composite': 'Composite', 'waxed': 'Waxed',
+    'mirror': 'Mirror', 'glassware': 'Glassware', 'lightbulb': 'Lightbulb',
 }
 
 # ==================== ENHANCED HELPER FUNCTIONS ====================
@@ -520,8 +528,15 @@ def get_category_from_class(class_name):
     """Map detected class name to waste category - FIXED VERSION"""
     class_name_lower = class_name.lower()
     
-    # DEBUG: Print what class we're trying to categorize
     print(f"  🤔 Classifying: '{class_name}' (lower: '{class_name_lower}')")
+    
+    # If model directly outputs waste categories (for 2-class model)
+    if class_name_lower == 'biodegradable':
+        print(f"    ✅ Direct waste category: BIODEGRADABLE")
+        return 'biodegradable'
+    elif class_name_lower == 'recyclable':
+        print(f"    ✅ Direct waste category: RECYCLABLE")
+        return 'recyclable'
     
     # ========== PRIORITY 1: Check exact matches in biodegradable keywords ==========
     for keyword, display_name in BIODEGRADABLE_KEYWORDS.items():
@@ -530,18 +545,15 @@ def get_category_from_class(class_name):
             return 'biodegradable'
     
     # ========== PRIORITY 2: Check if it's a fruit/vegetable/food ==========
-    # Fruits detection (comprehensive)
     fruit_keywords = ['fruit', 'berry', 'apple', 'banana', 'orange', 'pear', 'peach', 'grape', 'melon', 
                       'pineapple', 'mango', 'kiwi', 'lemon', 'lime', 'coconut', 'avocado', 'papaya', 
                       'guava', 'plum', 'cherry', 'apricot', 'fig', 'date', 'pomegranate']
     
-    # Vegetables detection
     vegetable_keywords = ['vegetable', 'broccoli', 'carrot', 'potato', 'tomato', 'onion', 'garlic', 
                           'cucumber', 'lettuce', 'spinach', 'cabbage', 'cauliflower', 'pepper', 
                           'capsicum', 'corn', 'pea', 'bean', 'celery', 'radish', 'turnip', 'beet', 
                           'eggplant', 'zucchini', 'pumpkin', 'squash']
     
-    # Food/general biodegradable
     food_keywords = ['food', 'bread', 'cake', 'pizza', 'meat', 'fish', 'rice', 'pasta', 'egg', 
                      'coffee', 'tea', 'plant', 'flower', 'seed', 'nut', 'organic', 'compost']
     
@@ -583,20 +595,16 @@ def get_category_from_class(class_name):
             return 'non_recyclable'
     
     # ========== PRIORITY 4: Intelligent fallback ==========
-    # Special cases that might be missed
     if any(word in class_name_lower for word in ['peel', 'core', 'scrap', 'leftover', 'waste', 'garbage']):
         print(f"    🗑️ Waste-related word detected → BIODEGRADABLE (fallback)")
         return 'biodegradable'
     
-    # Default based on model's class name analysis
     print(f"    ⚠️ No specific match found, analyzing class name...")
     
-    # If class name contains numbers or seems technical, default to non-recyclable
     if any(char.isdigit() for char in class_name):
         print(f"    🔢 Contains numbers → NON_RECYCLABLE (default)")
         return 'non_recyclable'
     
-    # Last resort: default to non-recyclable
     print(f"    ⚠️ Defaulting to NON_RECYCLABLE")
     return 'non_recyclable'
 
@@ -604,52 +612,21 @@ def get_object_name(detected_class):
     """Convert YOLO class names to proper object names - ENHANCED VERSION"""
     detected_class_lower = detected_class.lower()
     
-    # ========== PRIORITY: Check BIODEGRADABLE first ==========
-    for keyword, display_name in BIODEGRADABLE_KEYWORDS.items():
-        if keyword == detected_class_lower:
-            return display_name
+    # Direct waste categories
+    if detected_class_lower == 'biodegradable':
+        return 'Biodegradable Waste'
+    elif detected_class_lower == 'recyclable':
+        return 'Recyclable Material'
     
-    # ========== Check other categories ==========
-    for keyword, display_name in RECYCLABLE_KEYWORDS.items():
-        if keyword == detected_class_lower:
-            return display_name
+    # Check all keyword dictionaries
+    for keyword_dict in [BIODEGRADABLE_KEYWORDS, RECYCLABLE_KEYWORDS, 
+                         HAZARDOUS_KEYWORDS, NON_RECYCLABLE_KEYWORDS]:
+        for keyword, display_name in keyword_dict.items():
+            if keyword in detected_class_lower:
+                return display_name
     
-    for keyword, display_name in HAZARDOUS_KEYWORDS.items():
-        if keyword == detected_class_lower:
-            return display_name
-    
-    for keyword, display_name in NON_RECYCLABLE_KEYWORDS.items():
-        if keyword == detected_class_lower:
-            return display_name
-    
-    # ========== Check partial matches ==========
-    # Check biodegradable partial matches first
-    for keyword, display_name in BIODEGRADABLE_KEYWORDS.items():
-        if keyword in detected_class_lower:
-            return display_name
-    
-    # Check other categories
-    for keyword, display_name in RECYCLABLE_KEYWORDS.items():
-        if keyword in detected_class_lower:
-            return display_name
-    
-    for keyword, display_name in HAZARDOUS_KEYWORDS.items():
-        if keyword in detected_class_lower:
-            return display_name
-    
-    for keyword, display_name in NON_RECYCLABLE_KEYWORDS.items():
-        if keyword in detected_class_lower:
-            return display_name
-    
-    # ========== Default formatting ==========
-    # Try to make it readable
-    formatted = detected_class.replace('_', ' ').title()
-    
-    # Special case: if it ends with numbers, remove them
-    if formatted[-1].isdigit():
-        formatted = formatted.rstrip('0123456789').strip()
-    
-    return formatted
+    # Default formatting
+    return detected_class.replace('_', ' ').title()
 
 def process_yolo_prediction(results):
     """Convert YOLOv8 results to frontend format - ENHANCED VERSION"""
@@ -686,7 +663,7 @@ def process_yolo_prediction(results):
             # Get proper object name
             object_name = get_object_name(detected_class)
             
-            # Map detected object to waste category - THIS IS WHERE THE FIX HAPPENS
+            # Map detected object to waste category
             category = get_category_from_class(detected_class)
             
             # Get bin information
@@ -866,7 +843,7 @@ def model_info():
     model_data = {
         'status': 'loaded',
         'model_path': MODEL_PATH,
-        'model_name': Path(MODEL_PATH).name,
+        'model_name': Path(MODEL_PATH).name if '/' not in MODEL_PATH else MODEL_PATH.split('/')[-1],
         'model_hash': model_hash,
         'num_classes': len(yolo_model.names),
         'classes': yolo_model.names,
@@ -884,7 +861,8 @@ def model_info():
     
     # Add model stats if available
     try:
-        model_data['model_size_mb'] = round(os.path.getsize(MODEL_PATH) / 1024 / 1024, 1)
+        if not ('huggingface' in MODEL_PATH.lower() or 'http' in MODEL_PATH.lower()):
+            model_data['model_size_mb'] = round(os.path.getsize(MODEL_PATH) / 1024 / 1024, 1)
     except:
         pass
     
@@ -1013,6 +991,10 @@ def detect_from_base64():
         
         print(f"\n📸 ===== NEW DETECTION REQUEST =====")
         print(f"📦 Request received at: {time.strftime('%H:%M:%S')}")
+        
+        # Show which model is being used
+        model_name = "YOLOv8m (80+ classes)" if "yolov8m" in MODEL_PATH.lower() else "Custom waste model (2 classes)"
+        print(f"🔧 Using: {model_name}")
         print(f"🔧 Biodegradable detection: ENABLED (Enhanced mapping)")
         
         start_time = time.time()
@@ -1032,7 +1014,7 @@ def detect_from_base64():
         image_np = optimize_image_for_detection(image_np, target_size=640)
         print(f"📐 Optimized size: {image_np.shape[1]}x{image_np.shape[0]}")
         
-        print(f"🔍 Running YOLOv8 object detection...")
+        print(f"🔍 Running object detection...")
         
         # Get confidence threshold from request or use default
         confidence_threshold = float(data.get('confidence', 0.25))
@@ -1101,8 +1083,9 @@ def detect_from_base64():
                 'processed_size': f"{image_np.shape[1]}x{image_np.shape[0]}"
             },
             'model_info': {
-                'model_name': Path(MODEL_PATH).name,
+                'model_name': Path(MODEL_PATH).name if '/' not in MODEL_PATH else MODEL_PATH.split('/')[-1],
                 'model_hash': model_hash,
+                'model_type': model_name,
                 'classes': list(yolo_model.names.values()),
                 'bins_available': list(WASTE_BINS.keys())
             },
@@ -1112,13 +1095,22 @@ def detect_from_base64():
         
         # Add tips if no detections
         if len(detections) == 0:
-            response['tips'] = [
-                'Try pointing camera at actual waste objects',
-                'Ensure good lighting',
-                'Try different angles',
-                f'Try lower confidence threshold (current: {confidence_threshold})',
-                'Point camera at: fruits, vegetables, plastic bottles, batteries, etc.'
-            ]
+            if "yolov8m" in MODEL_PATH.lower():
+                response['tips'] = [
+                    'Try pointing camera at: fruits, vegetables, plastic bottles, cans, etc.',
+                    'Ensure good lighting and clear focus',
+                    'Try different angles',
+                    f'Try lower confidence threshold (current: {confidence_threshold})',
+                    'Suggested objects: apple, banana, bottle, can, cardboard'
+                ]
+            else:
+                response['tips'] = [
+                    'Point camera at general waste items',
+                    'Ensure good lighting',
+                    'Try different angles',
+                    f'Try lower confidence threshold (current: {confidence_threshold})',
+                    'Model detects: biodegradable vs recyclable waste'
+                ]
         
         return jsonify(response)
         
@@ -1142,41 +1134,29 @@ def internal_error(error):
     return jsonify({'error': 'Internal server error', 'success': False}), 500
 
 # ==================== MAIN EXECUTION ====================
+# Only run Flask dev server if running directly (not imported by Gunicorn)
 if __name__ == '__main__':
-    # Get port from Render's environment variable, default to 5001 for local development
-    port = int(os.environ.get('PORT', 5001))
+    # Check if we're in Railway production
+    is_railway = os.environ.get('RAILWAY_ENVIRONMENT') == 'production'
+    is_port_set = os.environ.get('PORT') is not None
     
-    # Determine host: use all interfaces for Render, localhost for local dev
-    # '0.0.0.0' makes the server externally visible (needed for Render)
-    # '127.0.0.1' is safer for local development
-    host = '0.0.0.0' if os.environ.get('RENDER', False) else '127.0.0.1'
-    
-    # Enable debug mode ONLY for local development
-    # On Render (production), debug should be False for security
-    debug_enabled = False if os.environ.get('RENDER', False) else True
-    
-    print(f"\n{'='*70}")
-    print(f"🌐 API STARTING")
-    print(f"{'='*70}")
-    print(f"📡 Host: {host}")
-    print(f"🔢 Port: {port}")
-    print(f"🔧 Debug mode: {'ENABLED (Local Dev)' if debug_enabled else 'DISABLED (Production)'}")
-    
-    if model_loaded:
-        print(f"\n✅ MODEL LOADED: {Path(MODEL_PATH).name} ({model_hash})")
-        print(f"   Total classes: {len(yolo_model.names)}")
-        print(f"   Bins configured: {len(WASTE_BINS)}")
+    # Only run Flask dev server for local development
+    if not is_railway and not is_port_set:
+        port = int(os.environ.get('PORT', 5001))
+        host = '127.0.0.1'
+        
+        print(f"\n{'='*70}")
+        print(f"🌐 STARTING FLASK DEV SERVER (Local Only)")
+        print(f"{'='*70}")
+        print(f"📡 Host: {host}")
+        print(f"🔢 Port: {port}")
+        print(f"⚠️  WARNING: This is for LOCAL DEVELOPMENT only!")
+        print(f"   Use 'gunicorn app:app' for production")
+        
+        app.run(host=host, port=port, debug=True)
     else:
-        print(f"\n⚠️  NO MODEL LOADED - API will run with limited functionality")
-    
-    print(f"\n📱 Available endpoints:")
-    print(f"   • http://{host}:{port}/ - API information")
-    print(f"   • http://{host}:{port}/health - Health check")
-    print(f"   • http://{host}:{port}/test - Test endpoint")
-    print(f"   • http://{host}:{port}/detect - Main detection endpoint (POST)")
-    print(f"\n📤 Send POST requests to /detect with JSON:")
-    print(f"   {{'image': 'base64_string_here', 'confidence': 0.25}}")
-    print(f"{'='*70}\n")
-    
-    # Start the Flask app with appropriate settings
-    app.run(host=host, port=port, debug=debug_enabled)
+        # In Railway/Gunicorn, just print info
+        print(f"\n{'='*70}")
+        print(f"✅ APP LOADED BY GUNICORN")
+        print(f"📡 Ready to serve requests")
+        print(f"{'='*70}")
