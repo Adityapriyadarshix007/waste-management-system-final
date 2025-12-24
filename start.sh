@@ -1,12 +1,21 @@
 #!/bin/bash
 
-# Get port from Railway environment or use default
+# Get port from Railway environment
 PORT=${PORT:-5001}
 echo "🚀 Starting Waste Detection API on port: $PORT"
 
-# Use gunicorn with sync workers (not gevent) for stability
+# Check if in Railway (production)
+if [ -n "$RAILWAY_ENVIRONMENT" ]; then
+    echo "📦 Railway Environment: $RAILWAY_ENVIRONMENT"
+    WORKERS=2
+else
+    echo "💻 Local Development"
+    WORKERS=1
+fi
+
+# Use gunicorn
 exec gunicorn --bind 0.0.0.0:$PORT \
-    --workers 2 \
+    --workers $WORKERS \
     --worker-class sync \
     --threads 4 \
     --timeout 120 \
