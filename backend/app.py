@@ -1134,29 +1134,18 @@ def internal_error(error):
     return jsonify({'error': 'Internal server error', 'success': False}), 500
 
 # ==================== MAIN EXECUTION ====================
-# Only run Flask dev server if running directly (not imported by Gunicorn)
 if __name__ == '__main__':
-    # Check if we're in Railway production
-    is_railway = os.environ.get('RAILWAY_ENVIRONMENT') == 'production'
-    is_port_set = os.environ.get('PORT') is not None
+    # Railway always sets PORT environment variable
+    port = int(os.environ.get('PORT', 5001))
     
-    # Only run Flask dev server for local development
-    if not is_railway and not is_port_set:
-        port = int(os.environ.get('PORT', 5001))
-        host = '127.0.0.1'
-        
-        print(f"\n{'='*70}")
-        print(f"🌐 STARTING FLASK DEV SERVER (Local Only)")
-        print(f"{'='*70}")
-        print(f"📡 Host: {host}")
-        print(f"🔢 Port: {port}")
-        print(f"⚠️  WARNING: This is for LOCAL DEVELOPMENT only!")
-        print(f"   Use 'gunicorn app:app' for production")
-        
-        app.run(host=host, port=port, debug=True)
-    else:
-        # In Railway/Gunicorn, just print info
-        print(f"\n{'='*70}")
-        print(f"✅ APP LOADED BY GUNICORN")
-        print(f"📡 Ready to serve requests")
-        print(f"{'='*70}")
+    print(f"\n{'='*70}")
+    print(f"🚀 STARTING FLASK SERVER")
+    print(f"{'='*70}")
+    print(f"📡 Host: 0.0.0.0")
+    print(f"🔢 Port: {port}")
+    print(f"🎯 Model: YOLOv8m (80 COCO classes → Waste mapping)")
+    print(f"🌐 Access: https://waste-management-system-final-production-eb97.up.railway.app")
+    print(f"{'='*70}\n")
+    
+    # Start the Flask server
+    app.run(host='0.0.0.0', port=port, debug=False)
