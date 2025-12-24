@@ -1,4 +1,4 @@
-# Dockerfile for Waste Detection API - UPDATED FOR Flask 3.1.0
+# Dockerfile for Waste Detection API - FINAL VERSION
 FROM python:3.10-slim-bullseye
 
 # Install system dependencies
@@ -31,41 +31,18 @@ COPY app.py .
 # Create necessary directories
 RUN mkdir -p uploads hf_cache logs
 
-# Install Python dependencies - MUST MATCH requirements.txt
+# Install Python dependencies - ALL AT ONCE to avoid conflicts
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir wheel setuptools && \
-    pip install --no-cache-dir --retries 10 --timeout 100 \
-        numpy==1.26.4 \
-        Pillow==10.4.0 \
-        opencv-python-headless==4.10.0.84 \
-        huggingface-hub==0.19.4 \
-        gunicorn==21.2.0 \
-        gevent==24.10.1 && \
-    pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
-        torch==2.9.1 \
-        torchvision==0.24.1 && \
-    pip install --no-cache-dir \
-        Flask==3.1.0 \
-        flask-sqlalchemy==3.1.1 \
-        flask-cors==4.0.0 \
-        ultralytics==8.3.240 && \
-    pip install --no-cache-dir \
-        tensorflow==2.20.0 \
-        keras==3.12.0 \
-        pandas==2.2.3 \
-        scikit-learn==1.5.0 \
-        seaborn==0.13.2 \
-        matplotlib==3.10.0 \
-        beautifulsoup4==4.14.3 \
-        lxml==5.3.0 \
-        requests==2.32.5 \
-        pyyaml==6.0.1
+    pip install --no-cache-dir --retries 10 --timeout 300 \
+        --extra-index-url https://download.pytorch.org/whl/cpu \
+        -r requirements.txt
 
 # Verify key installations
-RUN python -c "import flask; print(f'Flask {flask.__version__} installed')" && \
-    python -c "import ultralytics; print(f'Ultralytics {ultralytics.__version__} installed')" && \
-    python -c "import torch; print(f'PyTorch {torch.__version__} installed')" && \
-    python -c "import tensorflow as tf; print(f'TensorFlow {tf.__version__} installed')"
+RUN python -c "import flask; print(f'✅ Flask {flask.__version__}')" && \
+    python -c "import ultralytics; print(f'✅ Ultralytics {ultralytics.__version__}')" && \
+    python -c "import torch; print(f'✅ PyTorch {torch.__version__}')" && \
+    python -c "import tensorflow as tf; print(f'✅ TensorFlow {tf.__version__}')"
 
 # Create non-root user for security
 RUN useradd -m -u 1000 -s /bin/bash appuser && \
