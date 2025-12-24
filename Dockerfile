@@ -33,8 +33,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
         --extra-index-url https://download.pytorch.org/whl/cpu \
         -r requirements_light.txt
 
-# Copy app files from backend folder
-COPY backend/app.py backend/start.sh ./
+# Copy app files: app.py from backend, start.sh from root
+COPY backend/app.py .
+COPY start.sh .
 
 RUN chmod +x start.sh && mkdir -p hf_cache
 
