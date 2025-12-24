@@ -1,7 +1,7 @@
 FROM python:3.10-slim-bullseye
 
-# Install ALL required system dependencies for OpenCV, PyTorch, and GLib
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
@@ -24,8 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY requirements_light.txt .
+# Copy requirements from backend folder
+COPY backend/requirements_light.txt .
 
 # Install Python packages
 RUN pip install --no-cache-dir --upgrade pip && \
@@ -33,12 +33,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
         --extra-index-url https://download.pytorch.org/whl/cpu \
         -r requirements_light.txt
 
-# Copy app files
-COPY app.py start.sh ./
+# Copy app files from backend folder
+COPY backend/app.py backend/start.sh ./
 
 RUN chmod +x start.sh && mkdir -p hf_cache
 
 EXPOSE 5001
 
-# Use the start script
 CMD ["./start.sh"]
