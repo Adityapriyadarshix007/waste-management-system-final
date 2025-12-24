@@ -1161,17 +1161,15 @@ def internal_error(error):
 
 # ==================== MAIN EXECUTION ====================
 # Only run Flask dev server if running directly (not imported by Gunicorn)
+# ==================== MAIN EXECUTION ====================
+# CRITICAL: This block ONLY runs when executing: python app.py
+# When Railway runs start.sh -> gunicorn app:app, this block is NOT executed
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5001))
-    
     print(f"\n{'='*70}")
-    print(f"🌐 STARTING FLASK DEV SERVER (Local Only)")
-    print(f"{'='*70}")
-    print(f"🔢 Port: {port}")
-    print(f"⚠️  WARNING: This is for LOCAL DEVELOPMENT only!")
-    print(f"   For production, use: gunicorn --bind 0.0.0.0:$PORT --workers 1 --timeout 120 app:app")
+    print(f"🚀 LOCAL DEVELOPMENT MODE")
+    print(f"📡 Running: python app.py")
+    print(f"💡 For production, Railway uses start.sh -> gunicorn")
     print(f"{'='*70}")
     
-    # IMPORTANT: DO NOT load model in production mode
-    # In production, Gunicorn imports 'app' and this block is NOT executed
-    app.run(host='127.0.0.1', port=port, debug=False)  # debug=False to avoid double loading
+    # For local testing only - use fixed port 5000
+    app.run(host='127.0.0.1', port=5000, debug=False)
