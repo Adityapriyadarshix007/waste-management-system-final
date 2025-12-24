@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy only what's needed
+# Copy application files
 COPY requirements_optimized.txt .
 COPY app.py .
 
