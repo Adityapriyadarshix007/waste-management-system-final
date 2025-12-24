@@ -13,6 +13,8 @@ else
     WORKERS=1
 fi
 
+cd backend
+
 # Use gunicorn
 exec gunicorn --bind 0.0.0.0:$PORT \
     --workers $WORKERS \
@@ -22,3 +24,4 @@ exec gunicorn --bind 0.0.0.0:$PORT \
     --access-logfile - \
     --error-logfile - \
     app:app
+
