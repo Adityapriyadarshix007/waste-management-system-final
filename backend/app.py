@@ -60,7 +60,12 @@ model_hash = None
 
 # ==================== FLASK APP ====================
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=[
+    "http://localhost:5173",  # Vite dev server
+    "http://localhost:3000",  # Alternative local
+    "https://waste-management-system-frontend.vercel.app",  # Your Vercel frontend
+    "https://*.vercel.app"  # All Vercel deployments
+])
 
 # ==================== HUGGING FACE LOADING FUNCTION ====================
 def load_model_from_huggingface():
