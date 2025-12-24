@@ -1,3 +1,4 @@
+# ==================== IMPORTS ====================
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
@@ -12,6 +13,7 @@ import sys
 from pathlib import Path
 import hashlib
 import random
+import logging
 
 # Add this with your other imports at the top
 try:
@@ -29,6 +31,7 @@ print("="*70)
 print(f"🐍 Python {sys.version}")
 print(f"🖥️  Platform: {sys.platform}")
 print(f"📁 Working Directory: {os.getcwd()}")
+print(f"🔧 Environment: {'Railway/Production' if os.environ.get('PORT') else 'Local Development'}")
 
 # ==================== HUGGING FACE MODEL LOADING ====================
 # PRIORITY ORDER: yolov8m.pt FIRST, then custom model
@@ -98,12 +101,13 @@ def load_model_from_huggingface():
                     
                     print(f"   Repository: {repo_id}")
                     
-                    # Download from Hugging Face
+                    # Download from Hugging Face with Railway-compatible cache directory
+                    cache_dir = os.environ.get("MODEL_CACHE_DIR", "./hf_cache")
                     try:
                         local_model_path = hf_hub_download(
                             repo_id=repo_id,
                             filename=filename,
-                            cache_dir="./hf_cache",
+                            cache_dir=cache_dir,
                             force_download=False
                         )
                         
@@ -149,7 +153,7 @@ def load_model_from_huggingface():
         # If Hugging Face loading fails, try local fallback
         print("\n🔄 Hugging Face loading failed, trying local models...")
         
-        # YOUR ORIGINAL LOCAL MODEL SEARCH CODE
+        # LOCAL MODEL SEARCH CODE
         LOCAL_MODEL_PATHS = [
             Path("high_accuracy_training/waste_detector_pro/weights/best.pt"),
             Path("../runs/detect/train5/weights/best.pt"),
@@ -815,7 +819,8 @@ def home():
             '/waste-guide': 'GET - Get waste classification guide',
             '/stats': 'GET - Get waste statistics',
             '/train-model': 'POST - Train a new model'
-        }
+        },
+        'deployment': 'Railway' if os.environ.get('PORT') else 'Local'
     })
 
 @app.route('/health', methods=['GET'])
@@ -828,7 +833,9 @@ def health_check():
         'model_hash': model_hash,
         'available_classes': list(yolo_model.names.values()) if model_loaded else [],
         'bins_configured': len(WASTE_BINS),
-        'biodegradable_keywords_count': len(BIODEGRADABLE_KEYWORDS)
+        'biodegradable_keywords_count': len(BIODEGRADABLE_KEYWORDS),
+        'deployment': 'Railway' if os.environ.get('PORT') else 'Local',
+        'port': os.environ.get('PORT', '5001 (default)')
     })
 
 @app.route('/model-info', methods=['GET'])
@@ -856,7 +863,8 @@ def model_info():
             'recyclable_keywords': len(RECYCLABLE_KEYWORDS),
             'hazardous_keywords': len(HAZARDOUS_KEYWORDS),
             'non_recyclable_keywords': len(NON_RECYCLABLE_KEYWORDS)
-        }
+        },
+        'environment': 'Railway' if os.environ.get('PORT') else 'Local'
     }
     
     # Add model stats if available
@@ -886,7 +894,8 @@ def get_classes():
         'category_mapping_summary': {
             'biodegradable_items': list(BIODEGRADABLE_KEYWORDS.values())[:10],
             'total_biodegradable_keywords': len(BIODEGRADABLE_KEYWORDS)
-        }
+        },
+        'deployment': 'Railway' if os.environ.get('PORT') else 'Local'
     })
 
 @app.route('/bin-info/<bin_type>', methods=['GET'])
@@ -918,7 +927,8 @@ def get_all_bin_info():
         'count': len(WASTE_BINS),
         'waste_guide': WASTE_GUIDE,
         'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-        'special_note': 'FRUITS & VEGETABLES always go in GREEN biodegradable bin'
+        'special_note': 'FRUITS & VEGETABLES always go in GREEN biodegradable bin',
+        'deployment': 'Railway' if os.environ.get('PORT') else 'Local'
     })
 
 @app.route('/waste-guide', methods=['GET'])
@@ -929,7 +939,8 @@ def get_waste_guide():
         'guide': WASTE_GUIDE,
         'bins': WASTE_BINS,
         'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-        'important_note': 'All fruit and vegetable waste belongs in GREEN bin (biodegradable)'
+        'important_note': 'All fruit and vegetable waste belongs in GREEN bin (biodegradable)',
+        'deployment': 'Railway' if os.environ.get('PORT') else 'Local'
     })
 
 @app.route('/stats', methods=['GET'])
@@ -954,7 +965,8 @@ def get_waste_stats():
             },
             'biodegradable_keywords': len(BIODEGRADABLE_KEYWORDS)
         },
-        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+        'deployment': 'Railway' if os.environ.get('PORT') else 'Local'
     })
 
 @app.route('/test', methods=['GET'])
@@ -970,7 +982,9 @@ def test_endpoint():
         'waste_guide': WASTE_GUIDE,
         'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
         'model_path': MODEL_PATH,
-        'biodegradable_detection': 'ENABLED - All fruits/vegetables will be classified as biodegradable'
+        'biodegradable_detection': 'ENABLED - All fruits/vegetables will be classified as biodegradable',
+        'deployment': 'Railway' if os.environ.get('PORT') else 'Local',
+        'port': os.environ.get('PORT', '5001 (default)')
     })
 
 @app.route('/detect', methods=['POST'])
@@ -996,6 +1010,7 @@ def detect_from_base64():
         model_name = "YOLOv8m (80+ classes)" if "yolov8m" in MODEL_PATH.lower() else "Custom waste model (2 classes)"
         print(f"🔧 Using: {model_name}")
         print(f"🔧 Biodegradable detection: ENABLED (Enhanced mapping)")
+        print(f"🔧 Environment: {'Railway/Production' if os.environ.get('PORT') else 'Local Development'}")
         
         start_time = time.time()
         
@@ -1090,7 +1105,8 @@ def detect_from_base64():
                 'bins_available': list(WASTE_BINS.keys())
             },
             'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-            'biodegradable_note': 'All fruits and vegetables are automatically classified as biodegradable waste'
+            'biodegradable_note': 'All fruits and vegetables are automatically classified as biodegradable waste',
+            'deployment': 'Railway' if os.environ.get('PORT') else 'Local'
         }
         
         # Add tips if no detections
@@ -1135,10 +1151,12 @@ def internal_error(error):
 
 # ==================== MAIN EXECUTION ====================
 if __name__ == '__main__':
-    port = 5001
+    # Use Railway's PORT environment variable, fallback to 5001 for local
+    port = int(os.environ.get("PORT", 5001))
     
     print(f"\n{'='*70}")
     print(f"🌐 API STARTING ON PORT {port}")
+    print(f"🔧 Environment: {'Railway/Production' if os.environ.get('PORT') else 'Local Development'}")
     print(f"{'='*70}")
     print(f"📡 URL: http://localhost:{port}")
     print(f"🔗 Test: http://localhost:{port}/test")
@@ -1187,4 +1205,6 @@ if __name__ == '__main__':
     
     print(f"{'='*70}\n")
     
-    app.run(host='0.0.0.0', port=port, debug=True)
+    # Change debug mode based on environment
+    debug_mode = os.environ.get("DEBUG", "False").lower() == "true"
+    app.run(host='0.0.0.0', port=port, debug=debug_mode)
