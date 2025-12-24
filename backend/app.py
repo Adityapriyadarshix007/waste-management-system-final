@@ -1172,4 +1172,4 @@ if __name__ == '__main__':
     print(f"{'='*70}")
     
     # For local testing only - use fixed port 5000
-    app.run(host='127.0.0.1', port=5000, debug=False)
+    app.run(host='127.0.0.1', port=5000)
