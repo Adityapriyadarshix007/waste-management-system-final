@@ -9,6 +9,8 @@
     "restartPolicyMaxRetries": 10,
     "numReplicas": 1,
     "healthCheckPath": "/health",
-    "healthCheckTimeout": 60
+    "healthCheckTimeout": 60,
+    "startCommand": "./start.sh"
   }
 }
+
