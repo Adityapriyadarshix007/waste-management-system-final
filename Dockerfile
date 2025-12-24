@@ -15,6 +15,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
         --extra-index-url https://download.pytorch.org/whl/cpu \
         -r requirements_light.txt
 
+# Add gevent installation
+RUN pip install gevent
+
 RUN mkdir -p hf_cache
 
 EXPOSE 5001
