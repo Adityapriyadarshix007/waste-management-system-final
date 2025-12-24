@@ -1,0 +1,11 @@
+# Create the file with light dependencies
+echo "Flask==3.1.0
+flask-cors==4.0.0
+numpy==1.26.4
+torch==2.1.0
+torchvision==0.16.0
+opencv-python-headless==4.8.1.78
+Pillow==10.4.0
+ultralytics==8.0.196
+requests==2.31.0
+pyyaml==6.0.1" > requirements_light.txt
