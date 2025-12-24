@@ -15,12 +15,14 @@ RUN pip install --no-cache-dir --upgrade pip && \
         --extra-index-url https://download.pytorch.org/whl/cpu \
         -r requirements_light.txt
 
-# Add gevent installation
-RUN pip install gevent
+RUN pip install gevent  # Add gevent
 
 RUN mkdir -p hf_cache
 
 EXPOSE 5001
 
-# Use Python instead of Gunicorn
+# Set default PORT environment variable
+ENV PORT=5001
+
+# Use the environment variable
 CMD ["python", "app.py"]
