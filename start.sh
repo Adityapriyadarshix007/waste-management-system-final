@@ -1,9 +1,3 @@
 #!/bin/bash
-
-# Get port from environment or use default
-PORT=${PORT:-5001}
-
-echo "🚀 Starting Waste Detection API on port: $PORT"
-
-# Start the application
-exec python app.py
+echo "🚀 Starting Waste Detection API on port: ${PORT:-5001}"
+exec gunicorn --bind 0.0.0.0:${PORT:-5001} --workers 1 --threads 8 --timeout 120 app:app
