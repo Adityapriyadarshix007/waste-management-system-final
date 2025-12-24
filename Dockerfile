@@ -1,4 +1,4 @@
-# Dockerfile for Waste Detection API - FINAL WORKING VERSION
+# Dockerfile for Waste Detection API - UPDATED FOR Flask 3.1.0
 FROM python:3.10-slim-bullseye
 
 # Install system dependencies
@@ -15,6 +15,11 @@ RUN apt-get update && apt-get install -y \
     libpng16-16 \
     libtiff5 \
     libopenblas0 \
+    libhdf5-103-1 \
+    libc-ares2 \
+    libatlas3-base \
+    libssl3 \
+    libgfortran5 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -26,25 +31,41 @@ COPY app.py .
 # Create necessary directories
 RUN mkdir -p uploads hf_cache logs
 
-# Install Python dependencies - WITH GEVENT
+# Install Python dependencies - MUST MATCH requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir wheel setuptools && \
     pip install --no-cache-dir --retries 10 --timeout 100 \
-        Flask==2.3.3 \
-        flask-cors==4.0.0 \
-        numpy==1.24.3 \
-        Pillow==10.0.0 \
-        opencv-python-headless==4.8.1.78 \
+        numpy==1.26.4 \
+        Pillow==10.4.0 \
+        opencv-python-headless==4.10.0.84 \
         huggingface-hub==0.19.4 \
         gunicorn==21.2.0 \
-        gevent==24.10.1 && \  # GEVENT ADDED HERE
+        gevent==24.10.1 && \
     pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
-        torch==2.0.1 \
-        torchvision==0.15.2 && \
-    pip install --no-cache-dir ultralytics==8.0.196
+        torch==2.9.1 \
+        torchvision==0.24.1 && \
+    pip install --no-cache-dir \
+        Flask==3.1.0 \
+        flask-sqlalchemy==3.1.1 \
+        flask-cors==4.0.0 \
+        ultralytics==8.3.240 && \
+    pip install --no-cache-dir \
+        tensorflow==2.20.0 \
+        keras==3.12.0 \
+        pandas==2.2.3 \
+        scikit-learn==1.5.0 \
+        seaborn==0.13.2 \
+        matplotlib==3.10.0 \
+        beautifulsoup4==4.14.3 \
+        lxml==5.3.0 \
+        requests==2.32.5 \
+        pyyaml==6.0.1
 
-# Verify installations
-RUN python -c "import gevent; print(f'gevent {gevent.__version__} installed')"
+# Verify key installations
+RUN python -c "import flask; print(f'Flask {flask.__version__} installed')" && \
+    python -c "import ultralytics; print(f'Ultralytics {ultralytics.__version__} installed')" && \
+    python -c "import torch; print(f'PyTorch {torch.__version__} installed')" && \
+    python -c "import tensorflow as tf; print(f'TensorFlow {tf.__version__} installed')"
 
 # Create non-root user for security
 RUN useradd -m -u 1000 -s /bin/bash appuser && \
@@ -58,7 +79,10 @@ ENV PYTHONUNBUFFERED=1 \
     MODEL_CACHE_DIR=/app/hf_cache \
     HF_HOME=/app/hf_cache \
     TORCH_HOME=/app/hf_cache \
-    DEBUG=False
+    TF_CPP_MIN_LOG_LEVEL=3 \
+    TF_ENABLE_ONEDNN_OPTS=1 \
+    DEBUG=False \
+    OMP_NUM_THREADS=1
 
 EXPOSE 8080
 
