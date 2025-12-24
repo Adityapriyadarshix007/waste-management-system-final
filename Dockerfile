@@ -33,13 +33,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
         --extra-index-url https://download.pytorch.org/whl/cpu \
         -r requirements_light.txt
 
-# Copy app files: app.py from backend, start.sh from root
+# Copy app files
 COPY backend/app.py .
-COPY start.sh .
+RUN mkdir -p hf_cache
 
-RUN chmod +x start.sh && mkdir -p hf_cache
-
-EXPOSE 5001
-
-# WITH THIS:
-CMD ["./start.sh"]
+# The ENTRYPOINT is the gunicorn command itself
+ENTRYPOINT ["gunicorn"]
+CMD ["--bind", "0.0.0.0:${PORT:-5001}", "app:app"]
