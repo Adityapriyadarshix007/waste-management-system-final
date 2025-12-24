@@ -10,19 +10,17 @@ WORKDIR /app
 COPY requirements_light.txt .
 COPY app.py .
 
+# Install gevent FIRST to fix the gunicorn worker issue
+RUN pip install gevent==23.9.1
+
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --retries 3 --timeout 120 \
         --extra-index-url https://download.pytorch.org/whl/cpu \
         -r requirements_light.txt
 
-RUN pip install gevent  # Add gevent
-
 RUN mkdir -p hf_cache
 
 EXPOSE 5001
 
-# Set default PORT environment variable
-ENV PORT=5001
-
-# Use the environment variable
+# SIMPLE CMD - Let app.py handle the PORT internally
 CMD ["python", "app.py"]
