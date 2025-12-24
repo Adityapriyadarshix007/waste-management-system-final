@@ -1,7 +1,5 @@
-# Dockerfile for Waste Detection API - OPTIMIZED FOR SIZE
 FROM python:3.10-slim-bullseye
 
-# Install ONLY essential system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -17,35 +15,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy application files
-COPY requirements_optimized.txt .
-COPY app.py .
+COPY . .
 
-# Create directories
 RUN mkdir -p hf_cache
 
-# Install Python dependencies with size optimization
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir wheel setuptools && \
     pip install --no-cache-dir --retries 5 --timeout 180 \
         --extra-index-url https://download.pytorch.org/whl/cpu \
         -r requirements_optimized.txt
 
-# Clean pip cache to save space
-RUN pip cache purge
+ENV PORT=5001 HF_HOME=/app/hf_cache TORCH_HOME=/app/hf_cache
 
-# Remove unnecessary files
-RUN find /usr/local/lib/python3.10 -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
-    find /usr/local/lib/python3.10 -name "*.pyc" -delete
+EXPOSE 5001
 
-ENV PYTHONUNBUFFERED=1 \
-    PORT=5001 \
-    MODEL_CACHE_DIR=/app/hf_cache \
-    HF_HOME=/app/hf_cache \
-    TORCH_HOME=/app/hf_cache \
-    TF_CPP_MIN_LOG_LEVEL=3 \
-    DEBUG=False
-
-EXPOSE ${PORT}
-
-CMD ["python", "-u", "app.py"]
+# FIXED CMD - Use actual port number, not ${PORT}
+CMD ["gunicorn", "--bind", "0.0.0.0:5001", "--workers", "2", "--worker-class", "gevent", "--timeout", "120", "app:app"]
