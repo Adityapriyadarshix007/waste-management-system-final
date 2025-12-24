@@ -41,4 +41,5 @@ RUN chmod +x start.sh && mkdir -p hf_cache
 
 EXPOSE 5001
 
-CMD ["./start.sh"]
+# WITH THIS:
+CMD ["/bin/sh", "-c", "gunicorn --bind 0.0.0.0:$PORT app:app"]
