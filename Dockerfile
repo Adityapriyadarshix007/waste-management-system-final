@@ -1,7 +1,7 @@
-# Dockerfile for Waste Detection API - FINAL VERSION
-FROM python:3.10-slim-bullseye
+# Dockerfile for Waste Detection API - Simplified Working Version
+FROM python:3.11-slim-bookworm
 
-# Install system dependencies
+# Install minimal system dependencies
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -10,16 +10,10 @@ RUN apt-get update && apt-get install -y \
     libxrender1 \
     libgomp1 \
     curl \
-    wget \
     libjpeg62-turbo \
     libpng16-16 \
-    libtiff5 \
+    libtiff6 \
     libopenblas0 \
-    libhdf5-103-1 \
-    libc-ares2 \
-    libatlas3-base \
-    libssl3 \
-    libgfortran5 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -28,40 +22,29 @@ WORKDIR /app
 COPY requirements.txt .
 COPY app.py .
 
-# Create necessary directories
-RUN mkdir -p uploads hf_cache logs
+# Create directories with proper permissions
+RUN mkdir -p uploads hf_cache waste_dataset logs
 
-# Install Python dependencies - ALL AT ONCE to avoid conflicts
+# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir wheel setuptools && \
-    pip install --no-cache-dir --retries 10 --timeout 300 \
-        --extra-index-url https://download.pytorch.org/whl/cpu \
-        -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt
 
-# Verify key installations
-RUN python -c "import flask; print(f'✅ Flask {flask.__version__}')" && \
-    python -c "import ultralytics; print(f'✅ Ultralytics {ultralytics.__version__}')" && \
-    python -c "import torch; print(f'✅ PyTorch {torch.__version__}')" && \
-    python -c "import tensorflow as tf; print(f'✅ TensorFlow {tf.__version__}')"
-
-# Create non-root user for security
-RUN useradd -m -u 1000 -s /bin/bash appuser && \
-    chown -R appuser:appuser /app
-
-USER appuser
+# Verify installation
+RUN python -c "import flask; print(f'Flask {flask.__version__} installed')" && \
+    python -c "import ultralytics; print(f'Ultralytics {ultralytics.__version__} installed')" && \
+    python -c "import torch; print(f'PyTorch {torch.__version__} installed')"
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1 \
-    PORT=8080 \
+    PORT=5001 \
     MODEL_CACHE_DIR=/app/hf_cache \
     HF_HOME=/app/hf_cache \
     TORCH_HOME=/app/hf_cache \
-    TF_CPP_MIN_LOG_LEVEL=3 \
-    TF_ENABLE_ONEDNN_OPTS=1 \
-    DEBUG=False \
-    OMP_NUM_THREADS=1
+    DEBUG=True \
+    FLASK_ENV=development \
+    TF_CPP_MIN_LOG_LEVEL=0
 
-EXPOSE 8080
+EXPOSE ${PORT}
 
-# Use Gunicorn with gevent worker
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--worker-class", "gevent", "--timeout", "120", "app:app"]
+# Run with Python first (easier to debug)
+CMD ["python", "-u", "app.py"]
