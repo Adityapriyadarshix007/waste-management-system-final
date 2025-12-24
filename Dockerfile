@@ -1,8 +1,8 @@
-# Dockerfile for Waste Detection API - CORRECTED VERSION
+# Dockerfile for Waste Detection API - OPTIMIZED FOR SIZE
 FROM python:3.10-slim-bullseye
 
-# Install system dependencies for Debian Bullseye
-RUN apt-get update && apt-get install -y \
+# Install ONLY essential system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
@@ -12,45 +12,40 @@ RUN apt-get update && apt-get install -y \
     curl \
     libjpeg62-turbo \
     libpng16-16 \
-    libtiff5 \
     libopenblas0 \
-    libhdf5-103-1 \
-    libc-ares2 \
-    libgfortran5 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy application files
-COPY requirements.txt .
+# Copy only what's needed
+COPY requirements_optimized.txt .
 COPY app.py .
 
-# Create necessary directories
-RUN mkdir -p uploads hf_cache logs
+# Create directories
+RUN mkdir -p hf_cache
 
-# Install Python dependencies with PyTorch index
+# Install Python dependencies with size optimization
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir wheel setuptools && \
-    pip install --no-cache-dir --retries 10 --timeout 300 \
+    pip install --no-cache-dir --retries 5 --timeout 180 \
         --extra-index-url https://download.pytorch.org/whl/cpu \
-        -r requirements.txt
+        -r requirements_optimized.txt
 
-# Create non-root user
-RUN useradd -m -u 1000 -s /bin/bash appuser && \
-    chown -R appuser:appuser /app
+# Clean pip cache to save space
+RUN pip cache purge
 
-USER appuser
+# Remove unnecessary files
+RUN find /usr/local/lib/python3.10 -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
+    find /usr/local/lib/python3.10 -name "*.pyc" -delete
 
-# Environment variables
 ENV PYTHONUNBUFFERED=1 \
     PORT=5001 \
     MODEL_CACHE_DIR=/app/hf_cache \
     HF_HOME=/app/hf_cache \
     TORCH_HOME=/app/hf_cache \
     TF_CPP_MIN_LOG_LEVEL=3 \
-    DEBUG=True
+    DEBUG=False
 
 EXPOSE ${PORT}
 
-# Run with Python for debugging
 CMD ["python", "-u", "app.py"]
