@@ -68,30 +68,87 @@ model_loaded = False
 model_hash = None
 
 # ==================== FLASK APP WITH BULLETPROOF CORS ====================
+# ==================== FLASK APP WITH BULLETPROOF CORS ====================
 app = Flask(__name__)
 
-# Configure CORS to allow ALL origins and methods
-app.config['CORS_HEADERS'] = 'Content-Type'
+# ==================== LOCAL DEVELOPMENT ORIGINS ====================
+ALLOWED_LOCAL_ORIGINS = [
+    "http://localhost:5173",  # Vite default
+    "http://localhost:3000",  # Create React App default  
+    "http://localhost:5000",  # Alternative Flask port
+    "http://localhost:5001",  # Your frontend port
+    "http://127.0.0.1:5173",  # Vite with IP
+    "http://127.0.0.1:3000",  # React with IP
+    "http://127.0.0.1:5000",  # Flask with IP
+    "http://127.0.0.1:5001",  # Your port with IP
+]
 
-# Initialize CORS with maximum permissiveness
-CORS(app, 
-     resources={r"/*": {"origins": "*"}},
-     supports_credentials=True,
-     allow_headers=["*"],
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"])
+# ==================== DETECT ENVIRONMENT ====================
+# Detect if we're running on Railway
+IS_RAILWAY = 'RAILWAY_ENVIRONMENT' in os.environ or 'RAILWAY' in os.environ.get('HOSTNAME', '').upper()
+IS_LOCAL = not IS_RAILWAY
 
-# Force CORS headers on ALL responses
+print(f"🌍 Environment: {'RAILWAY (Production)' if IS_RAILWAY else 'LOCAL (Development)'}")
+
+# ==================== CORS CONFIGURATION ====================
+if IS_LOCAL:
+    # Local development: Use specific origins for security
+    print(f"🔧 CORS Mode: Local Development")
+    print(f"✅ Allowed origins: {ALLOWED_LOCAL_ORIGINS}")
+    
+    # Configure CORS for local dev
+    CORS(app, 
+         origins=ALLOWED_LOCAL_ORIGINS,
+         supports_credentials=True,
+         allow_headers=["*"],
+         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+         expose_headers=["Content-Type", "Authorization"])
+else:
+    # Railway production: Allow ALL origins
+    print(f"🔧 CORS Mode: Railway Production")
+    print(f"✅ Allowed origins: * (all)")
+    
+    # Configure CORS for Railway with maximum permissiveness
+    CORS(app, 
+         resources={r"/*": {"origins": "*"}},
+         supports_credentials=True,
+         allow_headers=["*"],
+         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"])
+
+# ==================== MANUAL CORS HEADERS (BACKUP) ====================
+# Force CORS headers on ALL responses - works for both environments
 @app.after_request
 def add_cors_headers(response):
     """Force CORS headers on every single response"""
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, Origin'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+    
+    if IS_LOCAL:
+        # Local development: Check origin against allowed list
+        origin = request.headers.get('Origin')
+        
+        # Allow if origin is in our allowed list
+        if origin and origin in ALLOWED_LOCAL_ORIGINS:
+            response.headers['Access-Control-Allow-Origin'] = origin
+        else:
+            # Allow any localhost during dev (flexibility)
+            if origin and ('localhost' in origin or '127.0.0.1' in origin):
+                response.headers['Access-Control-Allow-Origin'] = origin
+            else:
+                response.headers['Access-Control-Allow-Origin'] = 'http://localhost:5001'
+    else:
+        # Railway production: Allow ALL origins
+        response.headers['Access-Control-Allow-Origin'] = '*'
+    
+    # Common headers for both environments
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD'
     response.headers['Access-Control-Allow-Credentials'] = 'true'
-    response.headers['Access-Control-Max-Age'] = '86400'
+    response.headers['Access-Control-Expose-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Max-Age'] = '86400'  # 24 hours
+    
     return response
 
-# Explicit OPTIONS handler for all routes
+# ==================== EXPLICIT OPTIONS HANDLERS ====================
+# Explicit OPTIONS handler for all routes - works for both environments
 @app.route('/detect', methods=['OPTIONS'])
 @app.route('/health', methods=['OPTIONS'])
 @app.route('/classes', methods=['OPTIONS'])
@@ -99,11 +156,44 @@ def add_cors_headers(response):
 def handle_options():
     """Explicitly handle OPTIONS requests"""
     response = app.make_default_options_response()
-    response.headers['Access-Control-Allow-Origin'] = '*'
+    
+    if IS_LOCAL:
+        origin = request.headers.get('Origin')
+        if origin and origin in ALLOWED_LOCAL_ORIGINS:
+            response.headers['Access-Control-Allow-Origin'] = origin
+        elif origin and ('localhost' in origin or '127.0.0.1' in origin):
+            response.headers['Access-Control-Allow-Origin'] = origin
+        else:
+            response.headers['Access-Control-Allow-Origin'] = 'http://localhost:5001'
+    else:
+        response.headers['Access-Control-Allow-Origin'] = '*'
+    
+    response.headers['Access-Control-Allow-Headers'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = '*'
+    response.headers['Access-Control-Max-Age'] = '86400'
+    return response
+
+# ==================== CATCH-ALL OPTIONS HANDLER ====================
+# Handle OPTIONS for any other route not explicitly defined
+@app.route('/<path:path>', methods=['OPTIONS'])
+def catch_all_options(path):
+    """Catch-all OPTIONS handler for all other routes"""
+    response = app.make_default_options_response()
+    
+    if IS_LOCAL:
+        origin = request.headers.get('Origin')
+        if origin and origin in ALLOWED_LOCAL_ORIGINS:
+            response.headers['Access-Control-Allow-Origin'] = origin
+        elif origin and ('localhost' in origin or '127.0.0.1' in origin):
+            response.headers['Access-Control-Allow-Origin'] = origin
+        else:
+            response.headers['Access-Control-Allow-Origin'] = 'http://localhost:5001'
+    else:
+        response.headers['Access-Control-Allow-Origin'] = '*'
+    
     response.headers['Access-Control-Allow-Headers'] = '*'
     response.headers['Access-Control-Allow-Methods'] = '*'
     return response
-
 # ==================== HUGGING FACE LOADING FUNCTION ====================
 def load_model_from_huggingface():
     """Load YOLO model from Hugging Face Hub with fallbacks"""
