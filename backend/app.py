@@ -59,42 +59,70 @@ model_loaded = False
 model_hash = None
 
 # ==================== FLASK APP WITH BULLETPROOF CORS ====================
+# ==================== LOCAL DEVELOPMENT CORS CONFIGURATION ====================
 app = Flask(__name__)
 
-# Configure CORS to allow ALL origins and methods
-app.config['CORS_HEADERS'] = 'Content-Type'
+# Allow local development origins
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # Vite default
+    "http://localhost:3000",  # Create React App default  
+    "http://localhost:5000",  # Alternative Flask port
+    "http://localhost:5001",  # Your frontend port
+    "http://127.0.0.1:5173",  # Vite with IP
+    "http://127.0.0.1:3000",  # React with IP
+    "http://127.0.0.1:5000",  # Flask with IP
+    "http://127.0.0.1:5001",  # Your port with IP
+]
 
-# Initialize CORS with maximum permissiveness
+# Configure CORS for local dev
 CORS(app, 
-     resources={r"/*": {"origins": "*"}},
+     origins=ALLOWED_ORIGINS,
      supports_credentials=True,
      allow_headers=["*"],
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"])
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+     expose_headers=["Content-Type", "Authorization"])
 
 # Force CORS headers on ALL responses
 @app.after_request
 def add_cors_headers(response):
-    """Force CORS headers on every single response"""
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, Origin'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+    """Force CORS headers for local development"""
+    origin = request.headers.get('Origin')
+    
+    # Allow if origin is in our allowed list
+    if origin and origin in ALLOWED_ORIGINS:
+        response.headers['Access-Control-Allow-Origin'] = origin
+    else:
+        # Allow any localhost during dev
+        if origin and ('localhost' in origin or '127.0.0.1' in origin):
+            response.headers['Access-Control-Allow-Origin'] = origin
+        else:
+            response.headers['Access-Control-Allow-Origin'] = 'http://localhost:5001'
+    
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD'
     response.headers['Access-Control-Allow-Credentials'] = 'true'
-    response.headers['Access-Control-Max-Age'] = '86400'
+    response.headers['Access-Control-Expose-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Max-Age'] = '3600'
+    
     return response
 
 # Explicit OPTIONS handler for all routes
-@app.route('/detect', methods=['OPTIONS'])
-@app.route('/health', methods=['OPTIONS'])
-@app.route('/classes', methods=['OPTIONS'])
-@app.route('/', methods=['OPTIONS'])
+@app.before_request
 def handle_options():
-    """Explicitly handle OPTIONS requests"""
-    response = app.make_default_options_response()
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = '*'
-    return response
-
+    """Handle preflight OPTIONS requests for local development"""
+    if request.method == 'OPTIONS':
+        response = app.make_default_options_response()
+        
+        origin = request.headers.get('Origin')
+        if origin and ('localhost' in origin or '127.0.0.1' in origin):
+            response.headers['Access-Control-Allow-Origin'] = origin
+        else:
+            response.headers['Access-Control-Allow-Origin'] = 'http://localhost:5001'
+            
+        response.headers['Access-Control-Allow-Headers'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = '*'
+        response.headers['Access-Control-Max-Age'] = '3600'
+        return response
 # ==================== HUGGING FACE LOADING FUNCTION ====================
 def load_model_from_huggingface():
     """Load YOLO model from Hugging Face Hub with fallbacks"""
@@ -1205,4 +1233,4 @@ if __name__ == '__main__':
     print(f"{'='*70}")
     
     # For local testing only - use fixed port 5000
-    app.run(host='127.0.0.1', port=5000)
+    app.run(host='127.0.0.1', port=5001, debug = True)
