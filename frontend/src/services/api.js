@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // URLs for different environments
 const LOCAL_API_URL = 'http://localhost:5001';  // Local development
-const RAILWAY_API_URL = 'https://waste-management-system-final-production-eb97.up.railway.app';  // Your Railway URL
+const RAILWAY_API_URL = 'https://web-production-5378.up.railway.app'';  // Your Railway URL
 
 // Determine which URL to use based on environment
 const isDevelopment = window.location.hostname === 'localhost' || 
