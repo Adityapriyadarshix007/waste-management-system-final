@@ -1,3 +1,12 @@
+import os
+import gc
+
+# ==================== RAILWAY MEMORY OPTIMIZATION ====================
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = ''  # Disable GPU
+gc.enable()
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 import os
@@ -59,69 +68,42 @@ model_loaded = False
 model_hash = None
 
 # ==================== FLASK APP WITH BULLETPROOF CORS ====================
-# ==================== LOCAL DEVELOPMENT CORS CONFIGURATION ====================
-# ==================== UNIVERSAL CORS CONFIGURATION ====================
 app = Flask(__name__)
 
-# Detect if we're in production (Railway) or development
-IS_PRODUCTION = os.environ.get('RAILWAY_ENVIRONMENT') == 'production' or os.environ.get('FLASK_ENV') == 'production'
+# Configure CORS to allow ALL origins and methods
+app.config['CORS_HEADERS'] = 'Content-Type'
 
-if IS_PRODUCTION:
-    print("🚀 PRODUCTION MODE: Allowing all origins for Railway")
-    # In production, allow ALL origins
-    CORS(app, origins="*")
-else:
-    print("💻 DEVELOPMENT MODE: Allowing localhost origins")
-    # In development, allow localhost + Vercel
-    ALLOWED_ORIGINS = [
-        "http://localhost:*",  # All localhost ports
-        "http://127.0.0.1:*",  # All 127.0.0.1 ports
-        "https://waste-management-system-frontend.vercel.app",
-        "https://*.vercel.app",
-    ]
-    CORS(app, origins=ALLOWED_ORIGINS)
+# Initialize CORS with maximum permissiveness
+CORS(app, 
+     resources={r"/*": {"origins": "*"}},
+     supports_credentials=True,
+     allow_headers=["*"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"])
 
-# Force CORS headers on ALL responses (universal)
+# Force CORS headers on ALL responses
 @app.after_request
 def add_cors_headers(response):
-    """Force CORS headers for all environments"""
-    # In production, allow everything
-    if IS_PRODUCTION:
-        response.headers['Access-Control-Allow-Origin'] = '*'
-    else:
-        # In development, check origin
-        origin = request.headers.get('Origin', '')
-        if origin and ('localhost' in origin or '127.0.0.1' in origin or 'vercel.app' in origin):
-            response.headers['Access-Control-Allow-Origin'] = origin
-        else:
-            response.headers['Access-Control-Allow-Origin'] = '*'
-    
+    """Force CORS headers on every single response"""
+    response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, Origin'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
     response.headers['Access-Control-Allow-Credentials'] = 'true'
     response.headers['Access-Control-Max-Age'] = '86400'
-    
     return response
 
-# Handle OPTIONS requests for all routes
-@app.before_request
+# Explicit OPTIONS handler for all routes
+@app.route('/detect', methods=['OPTIONS'])
+@app.route('/health', methods=['OPTIONS'])
+@app.route('/classes', methods=['OPTIONS'])
+@app.route('/', methods=['OPTIONS'])
 def handle_options():
-    """Handle preflight OPTIONS requests"""
-    if request.method == 'OPTIONS':
-        response = app.make_default_options_response()
-        
-        if IS_PRODUCTION:
-            response.headers['Access-Control-Allow-Origin'] = '*'
-        else:
-            origin = request.headers.get('Origin', '')
-            if origin and ('localhost' in origin or '127.0.0.1' in origin or 'vercel.app' in origin):
-                response.headers['Access-Control-Allow-Origin'] = origin
-            else:
-                response.headers['Access-Control-Allow-Origin'] = '*'
-        
-        response.headers['Access-Control-Allow-Headers'] = '*'
-        response.headers['Access-Control-Allow-Methods'] = '*'
-        return response
+    """Explicitly handle OPTIONS requests"""
+    response = app.make_default_options_response()
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = '*'
+    return response
+
 # ==================== HUGGING FACE LOADING FUNCTION ====================
 def load_model_from_huggingface():
     """Load YOLO model from Hugging Face Hub with fallbacks"""
@@ -198,9 +180,9 @@ def load_model_from_huggingface():
                 print(f"🔢 Hash: {model_hash}")
                 
                 # Quick validation
-                # print("🧪 Running model validation...")
-                # test_img = np.zeros((100, 100, 3), dtype=np.uint8)
-                # test_results = yolo_model(test_img, conf=0.1, verbose=False)
+                print("🧪 Running model validation...")
+                test_img = np.zeros((100, 100, 3), dtype=np.uint8)
+                test_results = yolo_model(test_img, conf=0.1, verbose=False)
                 print("✅ Model validation passed")
                 
                 return True
@@ -785,7 +767,7 @@ def process_yolo_prediction(results):
     
     return detections
 
-def optimize_image_for_detection(image_np, target_size=640):
+def optimize_image_for_detection(image_np, target_size=320):
     """Optimize image for YOLO detection"""
     height, width = image_np.shape[:2]
     
@@ -996,6 +978,9 @@ def test_endpoint():
 def detect_from_base64():
     """MAIN ENDPOINT FOR REACT - Accepts base64 image"""
     try:
+        import gc
+        gc.collect()
+        
         # Load model only when needed
         if not load_model_lazy():
             return jsonify({
@@ -1031,7 +1016,7 @@ def detect_from_base64():
         print(f"📐 Original image size: {image.width}x{image.height}")
         
         # Optimize image for detection
-        image_np = optimize_image_for_detection(image_np, target_size=640)
+        image_np = optimize_image_for_detection(image_np, target_size=320)
         print(f"📐 Optimized size: {image_np.shape[1]}x{image_np.shape[0]}")
         
         print(f"🔍 Running object detection...")
@@ -1182,7 +1167,7 @@ def train_model():
         training_args = {
             'data': 'waste_dataset/dataset.yaml',
             'epochs': 50,
-            'imgsz': 640,
+            'imgsz': 320,
             'batch': 16,
             'save': True,
             'save_period': 10,
@@ -1232,4 +1217,4 @@ if __name__ == '__main__':
     print(f"{'='*70}")
     
     # For local testing only - use fixed port 5000
-    app.run(host='127.0.0.1', port=5001, debug = True)
+    app.run(host='127.0.0.1', port=5000)
