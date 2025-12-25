@@ -1,3 +1,14 @@
+# TO RUN THE PROJECT
+   
+   1. IN THE FIRST TERMINAL 
+      cd frontend
+      npm install
+      npm run dev
+
+   2. IN THE SECOND TERMINAL 
+      cd backend
+      python app.py
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
