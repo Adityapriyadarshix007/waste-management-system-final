@@ -60,68 +60,67 @@ model_hash = None
 
 # ==================== FLASK APP WITH BULLETPROOF CORS ====================
 # ==================== LOCAL DEVELOPMENT CORS CONFIGURATION ====================
+# ==================== UNIVERSAL CORS CONFIGURATION ====================
 app = Flask(__name__)
 
-# Allow local development origins
-ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Vite default
-    "http://localhost:3000",  # Create React App default  
-    "http://localhost:5000",  # Alternative Flask port
-    "http://localhost:5001",  # Your frontend port
-    "http://127.0.0.1:5173",  # Vite with IP
-    "http://127.0.0.1:3000",  # React with IP
-    "http://127.0.0.1:5000",  # Flask with IP
-    "http://127.0.0.1:5001",  # Your port with IP
-]
+# Detect if we're in production (Railway) or development
+IS_PRODUCTION = os.environ.get('RAILWAY_ENVIRONMENT') == 'production' or os.environ.get('FLASK_ENV') == 'production'
 
-# Configure CORS for local dev
-CORS(app, 
-     origins=ALLOWED_ORIGINS,
-     supports_credentials=True,
-     allow_headers=["*"],
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-     expose_headers=["Content-Type", "Authorization"])
+if IS_PRODUCTION:
+    print("🚀 PRODUCTION MODE: Allowing all origins for Railway")
+    # In production, allow ALL origins
+    CORS(app, origins="*")
+else:
+    print("💻 DEVELOPMENT MODE: Allowing localhost origins")
+    # In development, allow localhost + Vercel
+    ALLOWED_ORIGINS = [
+        "http://localhost:*",  # All localhost ports
+        "http://127.0.0.1:*",  # All 127.0.0.1 ports
+        "https://waste-management-system-frontend.vercel.app",
+        "https://*.vercel.app",
+    ]
+    CORS(app, origins=ALLOWED_ORIGINS)
 
-# Force CORS headers on ALL responses
+# Force CORS headers on ALL responses (universal)
 @app.after_request
 def add_cors_headers(response):
-    """Force CORS headers for local development"""
-    origin = request.headers.get('Origin')
-    
-    # Allow if origin is in our allowed list
-    if origin and origin in ALLOWED_ORIGINS:
-        response.headers['Access-Control-Allow-Origin'] = origin
+    """Force CORS headers for all environments"""
+    # In production, allow everything
+    if IS_PRODUCTION:
+        response.headers['Access-Control-Allow-Origin'] = '*'
     else:
-        # Allow any localhost during dev
-        if origin and ('localhost' in origin or '127.0.0.1' in origin):
+        # In development, check origin
+        origin = request.headers.get('Origin', '')
+        if origin and ('localhost' in origin or '127.0.0.1' in origin or 'vercel.app' in origin):
             response.headers['Access-Control-Allow-Origin'] = origin
         else:
-            response.headers['Access-Control-Allow-Origin'] = 'http://localhost:5001'
+            response.headers['Access-Control-Allow-Origin'] = '*'
     
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, Origin'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
     response.headers['Access-Control-Allow-Credentials'] = 'true'
-    response.headers['Access-Control-Expose-Headers'] = 'Content-Type, Authorization'
-    response.headers['Access-Control-Max-Age'] = '3600'
+    response.headers['Access-Control-Max-Age'] = '86400'
     
     return response
 
-# Explicit OPTIONS handler for all routes
+# Handle OPTIONS requests for all routes
 @app.before_request
 def handle_options():
-    """Handle preflight OPTIONS requests for local development"""
+    """Handle preflight OPTIONS requests"""
     if request.method == 'OPTIONS':
         response = app.make_default_options_response()
         
-        origin = request.headers.get('Origin')
-        if origin and ('localhost' in origin or '127.0.0.1' in origin):
-            response.headers['Access-Control-Allow-Origin'] = origin
+        if IS_PRODUCTION:
+            response.headers['Access-Control-Allow-Origin'] = '*'
         else:
-            response.headers['Access-Control-Allow-Origin'] = 'http://localhost:5001'
-            
+            origin = request.headers.get('Origin', '')
+            if origin and ('localhost' in origin or '127.0.0.1' in origin or 'vercel.app' in origin):
+                response.headers['Access-Control-Allow-Origin'] = origin
+            else:
+                response.headers['Access-Control-Allow-Origin'] = '*'
+        
         response.headers['Access-Control-Allow-Headers'] = '*'
         response.headers['Access-Control-Allow-Methods'] = '*'
-        response.headers['Access-Control-Max-Age'] = '3600'
         return response
 # ==================== HUGGING FACE LOADING FUNCTION ====================
 def load_model_from_huggingface():
