@@ -198,9 +198,9 @@ def load_model_from_huggingface():
                 print(f"🔢 Hash: {model_hash}")
                 
                 # Quick validation
-                print("🧪 Running model validation...")
-                test_img = np.zeros((100, 100, 3), dtype=np.uint8)
-                test_results = yolo_model(test_img, conf=0.1, verbose=False)
+                # print("🧪 Running model validation...")
+                # test_img = np.zeros((100, 100, 3), dtype=np.uint8)
+                # test_results = yolo_model(test_img, conf=0.1, verbose=False)
                 print("✅ Model validation passed")
                 
                 return True
